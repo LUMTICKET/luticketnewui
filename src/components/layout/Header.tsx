@@ -1,20 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { ModuleNav } from "./ModuleNav";
 import { CountrySwitcher } from "./CountrySwitcher";
 import { LinkButton } from "@/components/ui/Button";
 
-const navLinks = [
-  { href: "/bus", label: "Bus tickets" },
-  { href: "/events", label: "Events" },
-  { href: "/parcels", label: "Parcels" },
-  { href: "/business", label: "For business" },
-];
-
 export function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
@@ -23,85 +28,114 @@ export function Header() {
           <Logo />
         </Link>
 
-        <nav
-          aria-label="Primary"
-          className="hidden items-center gap-8 lg:flex"
-        >
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-ink-muted hover:text-navy-950"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/#module-search"
+            aria-label="Search"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-navy-950 hover:bg-surface-alt"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M16 16l-3.8-3.8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </Link>
+
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-line"
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
             >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                {menuOpen ? (
+                  <path
+                    d="M3 3l12 12M15 3L3 15"
+                    stroke="#0B1220"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <path
+                    d="M2 4.5h14M2 9h14M2 13.5h14"
+                    stroke="#0B1220"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
 
-        <div className="hidden items-center gap-3 lg:flex">
-          <CountrySwitcher />
-          <LinkButton href="/login" variant="ghost" size="sm">
-            Log in
-          </LinkButton>
-          <LinkButton href="/signup" variant="accent" size="sm">
-            Sign up
-          </LinkButton>
-        </div>
+            {menuOpen && (
+              <div className="absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-line bg-surface p-4 shadow-xl">
+                <p className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                  Region
+                </p>
+                <div className="mt-2">
+                  <CountrySwitcher />
+                </div>
 
-        <button
-          type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-line lg:hidden"
-          aria-label="Open menu"
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen((v) => !v)}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-            {mobileOpen ? (
-              <path
-                d="M3 3l12 12M15 3L3 15"
-                stroke="#0B1220"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            ) : (
-              <path
-                d="M2 4.5h14M2 9h14M2 13.5h14"
-                stroke="#0B1220"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
+                <div className="mt-4 flex flex-col border-t border-line pt-4">
+                  <Link
+                    href="/business"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
+                  >
+                    For business
+                  </Link>
+                  <Link
+                    href="/help"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
+                  >
+                    Help centre
+                  </Link>
+                  <Link
+                    href="/bookings"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
+                  >
+                    Manage my bookings
+                  </Link>
+                </div>
+
+                <div className="mt-4 flex gap-2 border-t border-line pt-4">
+                  <LinkButton
+                    href="/login"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Log in
+                  </LinkButton>
+                  <LinkButton
+                    href="/signup"
+                    variant="accent"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Sign up
+                  </LinkButton>
+                </div>
+              </div>
             )}
-          </svg>
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="border-t border-line bg-surface px-4 pb-6 pt-2 lg:hidden">
-          <nav aria-label="Mobile" className="flex flex-col">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="border-b border-line py-3 text-sm font-medium text-ink"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-4 flex flex-col gap-3">
-            <CountrySwitcher />
-            <div className="flex gap-3">
-              <LinkButton href="/login" variant="outline" size="md" className="flex-1">
-                Log in
-              </LinkButton>
-              <LinkButton href="/signup" variant="accent" size="md" className="flex-1">
-                Sign up
-              </LinkButton>
-            </div>
           </div>
         </div>
-      )}
+      </div>
+
+      <div className="border-t border-line">
+        <div className="mx-auto flex max-w-7xl items-center px-2 py-2 sm:px-4 lg:px-6">
+          <ModuleNav />
+        </div>
+      </div>
     </header>
   );
 }

@@ -1,36 +1,53 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 
-type Tab = "bus" | "events" | "parcel";
-
-const tabs: { id: Tab; label: string }[] = [
-  { id: "bus", label: "Bus tickets" },
-  { id: "events", label: "Events" },
-  { id: "parcel", label: "Track a parcel" },
-];
+type Module = "bus" | "events" | "parcel";
 
 const inputClasses =
   "h-12 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink placeholder:text-ink-faint focus:border-navy-400";
 
-export function SearchWidget() {
-  const [tab, setTab] = useState<Tab>("bus");
-  const router = useRouter();
+interface ModuleSearchBarProps {
+  module: Module;
+  defaultOrigin?: string;
+  defaultDestination?: string;
+  defaultDate?: string;
+  defaultQuery?: string;
+  defaultRef?: string;
+}
 
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [date, setDate] = useState("");
-  const [eventQuery, setEventQuery] = useState("");
-  const [trackingNo, setTrackingNo] = useState("");
+export function ModuleSearchBar({
+  module,
+  defaultOrigin = "",
+  defaultDestination = "",
+  defaultDate = "",
+  defaultQuery = "",
+  defaultRef = "",
+}: ModuleSearchBarProps) {
+  const router = useRouter();
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  const [origin, setOrigin] = useState(defaultOrigin);
+  const [destination, setDestination] = useState(defaultDestination);
+  const [date, setDate] = useState(defaultDate);
+  const [eventQuery, setEventQuery] = useState(defaultQuery);
+  const [trackingNo, setTrackingNo] = useState(defaultRef);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#module-search") {
+      firstFieldRef.current?.focus();
+    }
+  }, []);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (tab === "bus") {
+    if (module === "bus") {
       const params = new URLSearchParams({ origin, destination, date });
       router.push(`/bus?${params.toString()}`);
-    } else if (tab === "events") {
+    } else if (module === "events") {
       const params = new URLSearchParams({ q: eventQuery });
       router.push(`/events?${params.toString()}`);
     } else {
@@ -40,38 +57,19 @@ export function SearchWidget() {
   }
 
   return (
-    <div className="w-full max-w-3xl rounded-3xl bg-surface p-2 shadow-2xl shadow-navy-950/20">
-      <div
-        role="tablist"
-        aria-label="Search Lumiticket"
-        className="flex gap-1 p-1"
-      >
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-              tab === t.id
-                ? "bg-navy-950 text-white"
-                : "text-ink-muted hover:bg-surface-alt"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={onSubmit} className="p-3 pt-1">
-        {tab === "bus" && (
+    <div
+      id="module-search"
+      className="w-full max-w-3xl scroll-mt-28 rounded-3xl bg-surface p-3 shadow-2xl shadow-navy-950/20"
+    >
+      <form onSubmit={onSubmit}>
+        {module === "bus" && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
             <label className="sr-only" htmlFor="origin">
               Leaving from
             </label>
             <input
               id="origin"
+              ref={firstFieldRef}
               className={inputClasses}
               placeholder="Leaving from"
               value={origin}
@@ -103,13 +101,14 @@ export function SearchWidget() {
           </div>
         )}
 
-        {tab === "events" && (
+        {module === "events" && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
             <label className="sr-only" htmlFor="event-query">
               Search events, artists, or venues
             </label>
             <input
               id="event-query"
+              ref={firstFieldRef}
               className={inputClasses}
               placeholder="Search events, artists, or venues"
               value={eventQuery}
@@ -121,13 +120,14 @@ export function SearchWidget() {
           </div>
         )}
 
-        {tab === "parcel" && (
+        {module === "parcel" && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
             <label className="sr-only" htmlFor="tracking-no">
               Parcel tracking number
             </label>
             <input
               id="tracking-no"
+              ref={firstFieldRef}
               className={inputClasses}
               placeholder="Enter your parcel tracking number"
               value={trackingNo}
