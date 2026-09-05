@@ -15,6 +15,13 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
   const destination =
     typeof params.destination === "string" ? params.destination : "";
   const date = typeof params.date === "string" ? params.date : "";
+  const returnDate =
+    typeof params.returnDate === "string" ? params.returnDate : "";
+  const tripType = params.tripType === "return" ? "return" : "oneway";
+  const passengers = Math.max(
+    1,
+    Number(typeof params.passengers === "string" ? params.passengers : 1) || 1,
+  );
 
   const results = popularRoutes.filter(
     (r) =>
@@ -31,6 +38,9 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
           defaultOrigin={origin}
           defaultDestination={destination}
           defaultDate={date}
+          defaultReturnDate={returnDate}
+          defaultTripType={tripType}
+          defaultPassengers={passengers}
         />
       </SearchBand>
 
@@ -41,7 +51,15 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
               ? `${origin || "Anywhere"} → ${destination || "Anywhere"}`
               : "All bus routes"}
           </h1>
-          <Badge tone="neutral">{results.length} results</Badge>
+          <Badge tone="neutral">
+            {results.length} result{results.length === 1 ? "" : "s"}
+          </Badge>
+          <Badge tone="neutral">
+            {tripType === "return" ? "Return" : "One way"}
+          </Badge>
+          <Badge tone="neutral">
+            {passengers} passenger{passengers > 1 ? "s" : ""}
+          </Badge>
         </div>
         <p className="mt-1 text-sm text-ink-muted">
           Prices shown are per seat, from selected operators. Final price

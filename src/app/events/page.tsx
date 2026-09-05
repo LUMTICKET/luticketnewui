@@ -1,4 +1,4 @@
-import { trendingEvents } from "@/lib/data";
+import { countries, trendingEvents } from "@/lib/data";
 import { formatEventDate, formatPrice } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
 import { SearchBand } from "@/components/search/SearchBand";
@@ -18,28 +18,35 @@ const statusTone = {
 export default async function EventsPage(props: PageProps<"/events">) {
   const params = await props.searchParams;
   const q = typeof params.q === "string" ? params.q.toLowerCase() : "";
+  const country = typeof params.country === "string" ? params.country : "";
+  const countryName = countries.find((c) => c.code === country)?.name;
 
   const results = trendingEvents.filter(
     (e) =>
-      !q ||
-      e.title.toLowerCase().includes(q) ||
-      e.city.toLowerCase().includes(q) ||
-      e.category.toLowerCase().includes(q),
+      (!q ||
+        e.title.toLowerCase().includes(q) ||
+        e.city.toLowerCase().includes(q) ||
+        e.category.toLowerCase().includes(q)) &&
+      (!country || e.countryCode === country),
   );
 
   return (
     <div>
       <SearchBand>
-        <ModuleSearchBar module="events" defaultQuery={q} />
+        <ModuleSearchBar module="events" defaultQuery={q} defaultCountry={country} />
       </SearchBand>
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-navy-950">
-          {q ? `Events matching “${q}”` : "All events"}
+          {q
+            ? `Events matching “${q}”`
+            : countryName
+              ? `Events in ${countryName}`
+              : "All events"}
         </h1>
         <p className="mt-1 text-sm text-ink-muted">
-          {results.length} event{results.length === 1 ? "" : "s"} across the
-          region.
+          {results.length} event{results.length === 1 ? "" : "s"}
+          {countryName ? ` in ${countryName}` : " across the region"}.
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

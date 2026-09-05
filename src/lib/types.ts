@@ -26,6 +26,7 @@ export interface EventListing {
   category: string;
   venue: string;
   city: string;
+  countryCode: string;
   date: string;
   fromPrice: number;
   currency: string;

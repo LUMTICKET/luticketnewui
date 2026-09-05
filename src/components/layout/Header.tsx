@@ -132,7 +132,7 @@ export function Header() {
       </div>
 
       <div className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl items-center px-2 py-2 sm:px-4 lg:px-6">
+        <div className="mx-auto flex max-w-7xl items-center px-2 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3">
           <ModuleNav />
         </div>
       </div>
