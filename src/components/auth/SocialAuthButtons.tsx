@@ -1,13 +1,125 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 const buttonClasses =
   "inline-flex h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-surface text-sm font-semibold text-ink transition-colors hover:border-navy-300 hover:bg-surface-alt";
 
-export function SocialAuthButtons({ label = "continue" }: { label?: string }) {
+interface GoogleIdentity {
+  accounts: {
+    id: {
+      initialize: (options: {
+        client_id: string;
+        use_fedcm_for_prompt?: boolean;
+        callback: (response: { credential: string }) => void;
+      }) => void;
+      renderButton: (element: HTMLElement, options: {
+        type: "standard";
+        theme: "outline";
+        size: "large";
+        text: "signin_with" | "signup_with";
+        shape: "rectangular";
+        width: number;
+      }) => void;
+    };
+  };
+}
+
+declare global {
+  interface Window {
+    google?: GoogleIdentity;
+  }
+}
+
+let googleScriptPromise: Promise<void> | null = null;
+let googleInitializedClientId = "";
+let googleCredentialHandler: ((idToken: string) => void) | undefined;
+let googleErrorHandler: ((message: string) => void) | undefined;
+
+function loadGoogleScript() {
+  if (window.google) return Promise.resolve();
+  if (googleScriptPromise) return googleScriptPromise;
+
+  googleScriptPromise = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Could not load Google sign-in."));
+    document.head.appendChild(script);
+  });
+
+  return googleScriptPromise;
+}
+
+export function SocialAuthButtons({
+  label = "continue",
+  onGoogle,
+  onGoogleError,
+}: {
+  label?: string;
+  onGoogle?: (idToken: string) => void;
+  onGoogleError?: (message: string) => void;
+}) {
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [googleReady, setGoogleReady] = useState(false);
+
+  useEffect(() => {
+    googleCredentialHandler = onGoogle;
+    googleErrorHandler = onGoogleError;
+    return () => {
+      googleCredentialHandler = undefined;
+      googleErrorHandler = undefined;
+    };
+  }, [onGoogle, onGoogleError]);
+
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (!clientId) {
+      googleErrorHandler?.("Google sign-in is not configured. Add NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID to .env.local.");
+      return;
+    }
+
+    loadGoogleScript()
+      .then(() => {
+        if (!window.google) return;
+        if (!googleInitializedClientId) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            use_fedcm_for_prompt: true,
+            callback: ({ credential }) => googleCredentialHandler?.(credential),
+          });
+          googleInitializedClientId = clientId;
+        }
+        if (googleButtonRef.current) {
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: label === "Sign up" ? "signup_with" : "signin_with",
+            shape: "rectangular",
+            width: 400,
+          });
+        }
+        setGoogleReady(true);
+      })
+      .catch(() => {
+        setGoogleReady(false);
+        googleErrorHandler?.("Could not load Google sign-in. Check your connection and try again.");
+      });
+  // The Google loader must run once per mounted auth surface. The callback is
+  // stable in AuthForm, and keeping this dependency list empty also prevents
+  // Fast Refresh from changing the hook signature during development.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" className={buttonClasses}>
-        <GoogleIcon />
-        {label === "continue" ? "Continue with Google" : `${label} with Google`}
-      </button>
+      <div
+        ref={googleButtonRef}
+        className="flex min-h-12 w-full items-center justify-center overflow-hidden"
+        aria-label={googleReady ? "Continue with Google" : "Loading Google sign-in"}
+      />
       <button type="button" className={buttonClasses}>
         <AppleIcon />
         {label === "continue" ? "Continue with Apple" : `${label} with Apple`}
@@ -23,29 +135,6 @@ export function AuthDivider({ children }: { children: React.ReactNode }) {
       {children}
       <span className="h-px flex-1 bg-line" />
     </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
-      <path
-        fill="#FFC107"
-        d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24 c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
-      />
-      <path
-        fill="#FF3D00"
-        d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039 l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36 c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
-      />
-    </svg>
   );
 }
 
