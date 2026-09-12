@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import type { BusRoute } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
+import { getAuthSession } from "@/lib/auth";
+import {
+  AccountNudge,
+  GuestDetailsStep,
+  type GuestDetails,
+} from "@/components/checkout/GuestDetailsStep";
+
+type Step = "select" | "details" | "confirmed";
 
 const HOLD_SECONDS = 5 * 60;
 const ROWS = 10;
@@ -26,8 +34,10 @@ export function SeatSelector({
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  const [step, setStep] = useState<Step>("select");
+  const [guest, setGuest] = useState<GuestDetails | null>(null);
   const [expiredNotice, setExpiredNotice] = useState(false);
+  const loggedIn = Boolean(getAuthSession());
 
   const seats = useMemo(() => {
     const rows: string[][] = [];
@@ -53,7 +63,7 @@ export function SeatSelector({
   }, [secondsLeft]);
 
   function toggleSeat(seat: string) {
-    if (BOOKED_SEATS.has(seat) || confirmed) return;
+    if (BOOKED_SEATS.has(seat) || step !== "select") return;
     setExpiredNotice(false);
 
     setSelected((prev) => {
@@ -70,12 +80,32 @@ export function SeatSelector({
   }
 
   const total = selected.length * route.fromPrice;
-  const canContinue = selected.length === passengers && !confirmed;
+  const canContinue = selected.length === passengers && step === "select";
   const reference = `LMT-${route.id.toUpperCase()}-${Math.abs(
     Array.from(selected.join("")).reduce((a, c) => a + c.charCodeAt(0), 7),
   )}`;
 
-  if (confirmed) {
+  function handleConfirmClick() {
+    if (loggedIn) {
+      setStep("confirmed");
+    } else {
+      setStep("details");
+    }
+  }
+
+  if (step === "details") {
+    return (
+      <GuestDetailsStep
+        onBack={() => setStep("select")}
+        onSubmit={(details) => {
+          setGuest(details);
+          setStep("confirmed");
+        }}
+      />
+    );
+  }
+
+  if (step === "confirmed") {
     return (
       <div className="rounded-2xl border border-line p-8 text-center">
         <Badge tone="success">Booking confirmed</Badge>
@@ -94,8 +124,12 @@ export function SeatSelector({
 
         <p className="mt-4 text-sm text-ink-muted">Reference: {reference}</p>
         <p className="mt-1 text-xs text-ink-faint">
-          Saved to your account and available offline at boarding.
+          {guest
+            ? `Sent to ${guest.name} at ${guest.contact}. `
+            : ""}
+          Available offline at boarding.
         </p>
+        <AccountNudge loggedIn={loggedIn} />
       </div>
     );
   }
@@ -201,7 +235,7 @@ export function SeatSelector({
           size="lg"
           className="mt-6 w-full"
           disabled={!canContinue}
-          onClick={() => setConfirmed(true)}
+          onClick={handleConfirmClick}
         >
           Confirm &amp; pay
         </Button>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatPrice } from "@/lib/format";
+import { getAuthSession } from "@/lib/auth";
+import { AccountNudge } from "@/components/checkout/GuestDetailsStep";
 
 const BASE_FEE = 3000;
 const PER_KG = 1500;
@@ -20,6 +22,7 @@ export default function SendParcelPage() {
   const [pickup, setPickup] = useState("");
   const [delivery, setDelivery] = useState("");
   const [recipientName, setRecipientName] = useState("");
+  const loggedIn = Boolean(getAuthSession());
 
   const cost = estimateCost(weight);
 
@@ -51,6 +54,7 @@ export default function SendParcelPage() {
         <p className="mt-1 text-xs text-ink-faint">
           Estimated cost: {formatPrice(cost, "MWK")} · pay online or at pickup
         </p>
+        <AccountNudge loggedIn={loggedIn} />
 
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <LinkButton href={`/parcels?ref=${reference}`} variant="primary" size="md">

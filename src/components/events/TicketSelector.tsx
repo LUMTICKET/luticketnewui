@@ -5,13 +5,23 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import type { EventListing, EventTicketType } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
+import { getAuthSession } from "@/lib/auth";
+import {
+  AccountNudge,
+  GuestDetailsStep,
+  type GuestDetails,
+} from "@/components/checkout/GuestDetailsStep";
+
+type Step = "select" | "details" | "confirmed";
 
 export function TicketSelector({ event }: { event: EventListing }) {
   const ticketTypes = useMemo(() => event.ticketTypes ?? [], [event.ticketTypes]);
   const [quantities, setQuantities] = useState<Record<string, number>>(
     Object.fromEntries(ticketTypes.map((t) => [t.name, 0])),
   );
-  const [confirmed, setConfirmed] = useState(false);
+  const [step, setStep] = useState<Step>("select");
+  const [guest, setGuest] = useState<GuestDetails | null>(null);
+  const loggedIn = Boolean(getAuthSession());
 
   const soldOut = event.status === "sold-out" || ticketTypes.every((t) => t.remaining === 0);
 
@@ -30,7 +40,27 @@ export function TicketSelector({ event }: { event: EventListing }) {
     Array.from(event.id + totalQty).reduce((a, c) => a + c.charCodeAt(0), 11),
   )}`;
 
-  if (confirmed) {
+  function handleConfirmClick() {
+    if (loggedIn) {
+      setStep("confirmed");
+    } else {
+      setStep("details");
+    }
+  }
+
+  if (step === "details") {
+    return (
+      <GuestDetailsStep
+        onBack={() => setStep("select")}
+        onSubmit={(details) => {
+          setGuest(details);
+          setStep("confirmed");
+        }}
+      />
+    );
+  }
+
+  if (step === "confirmed") {
     return (
       <div className="rounded-2xl border border-line p-8 text-center">
         <Badge tone="success">Tickets confirmed</Badge>
@@ -47,8 +77,10 @@ export function TicketSelector({ event }: { event: EventListing }) {
 
         <p className="mt-4 text-sm text-ink-muted">Reference: {reference}</p>
         <p className="mt-1 text-xs text-ink-faint">
-          Saved to your account and available offline at the gate.
+          {guest ? `Sent to ${guest.name} at ${guest.contact}. ` : ""}
+          Available offline at the gate.
         </p>
+        <AccountNudge loggedIn={loggedIn} />
       </div>
     );
   }
@@ -105,7 +137,7 @@ export function TicketSelector({ event }: { event: EventListing }) {
           size="lg"
           className="mt-6 w-full"
           disabled={totalQty === 0}
-          onClick={() => setConfirmed(true)}
+          onClick={handleConfirmClick}
         >
           Confirm &amp; pay
         </Button>
