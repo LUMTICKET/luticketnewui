@@ -20,6 +20,13 @@ export interface BusRoute {
   rating: number;
 }
 
+export interface EventTicketType {
+  name: string;
+  price: number;
+  perks: string[];
+  remaining: number;
+}
+
 export interface EventListing {
   id: string;
   title: string;
@@ -31,4 +38,6 @@ export interface EventListing {
   fromPrice: number;
   currency: string;
   status: "on-sale" | "selling-fast" | "sold-out";
+  description?: string;
+  ticketTypes?: EventTicketType[];
 }

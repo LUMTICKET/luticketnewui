@@ -92,6 +92,13 @@ export const trendingEvents: EventListing[] = [
     fromPrice: 35000,
     currency: "MWK",
     status: "selling-fast",
+    description:
+      "Three days of live music on the shores of Lake Malawi, bringing together regional and international acts across two stages.",
+    ticketTypes: [
+      { name: "Day Pass", price: 35000, perks: ["Single-day entry"], remaining: 120 },
+      { name: "Weekend Pass", price: 85000, perks: ["Full weekend entry", "Fast-track gate"], remaining: 40 },
+      { name: "VIP", price: 160000, perks: ["Full weekend entry", "VIP viewing deck", "Backstage tour"], remaining: 8 },
+    ],
   },
   {
     id: "e2",
@@ -104,6 +111,12 @@ export const trendingEvents: EventListing[] = [
     fromPrice: 12000,
     currency: "MWK",
     status: "on-sale",
+    description:
+      "An evening of stand-up from Malawi's sharpest comedians, with a headline set from a special guest act.",
+    ticketTypes: [
+      { name: "General Admission", price: 12000, perks: ["Standing entry"], remaining: 200 },
+      { name: "Reserved Seating", price: 22000, perks: ["Reserved seat", "Welcome drink"], remaining: 35 },
+    ],
   },
   {
     id: "e3",
@@ -116,6 +129,12 @@ export const trendingEvents: EventListing[] = [
     fromPrice: 150,
     currency: "ZMW",
     status: "on-sale",
+    description:
+      "An open-air gospel celebration bringing together choirs and artists from across the Copperbelt region.",
+    ticketTypes: [
+      { name: "General Admission", price: 150, perks: ["Stadium entry"], remaining: 500 },
+      { name: "Covered Stand", price: 320, perks: ["Covered seating", "Programme booklet"], remaining: 90 },
+    ],
   },
   {
     id: "e4",
@@ -128,6 +147,12 @@ export const trendingEvents: EventListing[] = [
     fromPrice: 80,
     currency: "USD",
     status: "sold-out",
+    description:
+      "A one-day summit for founders and executives across the SADC region, with panels on trade, logistics, and cross-border payments.",
+    ticketTypes: [
+      { name: "Delegate Pass", price: 80, perks: ["Full-day access", "Lunch included"], remaining: 0 },
+      { name: "Executive Pass", price: 180, perks: ["Full-day access", "Lunch included", "Networking dinner"], remaining: 0 },
+    ],
   },
 ];
 
