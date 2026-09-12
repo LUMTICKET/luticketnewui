@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
@@ -33,9 +34,9 @@ export default function TermsPage() {
           Customer accounts require a valid email or mobile number. Operator,
           courier, agent, and organizer accounts additionally require identity
           and business verification (KYC/KYB) before activation — see our{" "}
-          <a href="/legal/kyc" className="font-medium text-navy-950 underline">
+          <Link href="/legal/kyc" className="font-medium text-navy-950 underline">
             Verification &amp; KYC policy
-          </a>{" "}
+          </Link>{" "}
           for details. Every staff account under an operator or agent must be
           individually attributable; shared logins are not permitted.
         </p>
@@ -98,9 +99,9 @@ export default function TermsPage() {
       <LegalSection title="10. Contact">
         <p>
           Questions about these terms can be sent through our{" "}
-          <a href="/contact" className="font-medium text-navy-950 underline">
+          <Link href="/contact" className="font-medium text-navy-950 underline">
             contact page
-          </a>
+          </Link>
           .
         </p>
       </LegalSection>

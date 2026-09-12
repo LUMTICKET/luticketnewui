@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
@@ -74,9 +75,9 @@ export default function PrivacyPage() {
           ask us to correct inaccurate details, or request account deletion,
           subject to records we&apos;re required to retain for legal or
           accounting reasons. Contact us through our{" "}
-          <a href="/contact" className="font-medium text-navy-950 underline">
+          <Link href="/contact" className="font-medium text-navy-950 underline">
             contact page
-          </a>{" "}
+          </Link>{" "}
           to make a request.
         </p>
       </LegalSection>
