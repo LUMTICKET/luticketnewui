@@ -6,8 +6,124 @@ export interface AuthSession {
   refreshExpiresAt?: string;
 }
 
+export interface AuthUser {
+  id: number | string;
+  email: string;
+  name?: string;
+  country?: string;
+  [key: string]: unknown;
+}
+
+export interface BusinessProfile {
+  id: number | string;
+  businessName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  type?: string;
+  website?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+const SESSION_KEY = "lumiticket.auth";
+
 export function getApiBaseUrl() {
   return (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+}
+
+export function getAuthSession(): AuthSession | null {
+  if (typeof window === "undefined") return null;
+  const raw =
+    window.localStorage.getItem(SESSION_KEY) ||
+    window.sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthSession;
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_KEY);
+  window.sessionStorage.removeItem(SESSION_KEY);
+}
+
+async function authorizedRequest<T>(
+  path: string,
+  token: string,
+  init: RequestInit = {},
+): Promise<T | null> {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers as Record<string, string> | undefined),
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+    },
+  });
+
+  if (response.status === 404) return null;
+
+  const payload = (await response.json().catch(() => null)) as
+    | (T & { message?: string; error?: string })
+    | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || "Request failed.");
+  }
+
+  return payload as T;
+}
+
+export function getCurrentUser(token: string) {
+  return authorizedRequest<AuthUser>("/api/auth/me", token);
+}
+
+export function getBusinessProfile(token: string) {
+  return authorizedRequest<BusinessProfile>("/api/kyb", token);
+}
+
+export function createBusinessProfile(
+  token: string,
+  profile: Omit<BusinessProfile, "id">,
+) {
+  return authorizedRequest<BusinessProfile>("/api/kyb", token, {
+    method: "POST",
+    body: JSON.stringify(profile),
+  });
+}
+
+export interface EventSummary {
+  id: number | string;
+  title: string;
+  category: string;
+  location: string;
+  startsAt: string;
+  [key: string]: unknown;
+}
+
+export async function listEvents(token: string, businessProfileId: number | string) {
+  const result = await authorizedRequest<EventSummary[]>(
+    `/api/events?businessProfileId=${businessProfileId}`,
+    token,
+  );
+  return result ?? [];
+}
+
+export async function logoutSession(token: string) {
+  try {
+    await fetch(`${getApiBaseUrl()}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Best-effort — clearing the local session still logs the user out client-side.
+  }
 }
 
 export async function authRequest<T>(path: string, body: Record<string, unknown>) {
@@ -58,5 +174,5 @@ export function googleAuth(idToken: string, email: string, name: string, avatar:
 
 export function saveAuthSession(session: AuthSession, remember = true) {
   const storage = remember ? window.localStorage : window.sessionStorage;
-  storage.setItem("lumiticket.auth", JSON.stringify(session));
+  storage.setItem(SESSION_KEY, JSON.stringify(session));
 }

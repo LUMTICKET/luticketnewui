@@ -2,14 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Logo } from "./Logo";
 import { ModuleNav } from "./ModuleNav";
 import { CountrySwitcher } from "./CountrySwitcher";
-import { LinkButton } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
+import { clearAuthSession, getAuthSession, logoutSession } from "@/lib/auth";
 
 export function Header() {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Session lives in localStorage, unavailable during SSR — reading it
+    // after mount (instead of as lazy initial state) avoids a hydration
+    // mismatch between the server-rendered markup and the client render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoggedIn(Boolean(getAuthSession()));
+  }, []);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -20,6 +33,18 @@ export function Header() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    const session = getAuthSession();
+    if (session) await logoutSession(session.token);
+    clearAuthSession();
+    setLoggedIn(false);
+    setLoggingOut(false);
+    setMenuOpen(false);
+    router.push("/");
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
@@ -106,24 +131,50 @@ export function Header() {
                 </div>
 
                 <div className="mt-4 flex gap-2 border-t border-line pt-4">
-                  <LinkButton
-                    href="/login"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Log in
-                  </LinkButton>
-                  <LinkButton
-                    href="/signup"
-                    variant="accent"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Sign up
-                  </LinkButton>
+                  {loggedIn ? (
+                    <>
+                      <LinkButton
+                        href="/dashboard"
+                        variant="accent"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Dashboard
+                      </LinkButton>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                      >
+                        {loggingOut ? "Logging out…" : "Log out"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <LinkButton
+                        href="/login"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Log in
+                      </LinkButton>
+                      <LinkButton
+                        href="/signup"
+                        variant="accent"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Sign up
+                      </LinkButton>
+                    </>
+                  )}
                 </div>
               </div>
             )}
