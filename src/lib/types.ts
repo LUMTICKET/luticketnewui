@@ -41,3 +41,15 @@ export interface EventListing {
   description?: string;
   ticketTypes?: EventTicketType[];
 }
+
+export interface CustomerBooking {
+  id: string;
+  kind: "bus" | "event" | "parcel";
+  title: string;
+  detail: string;
+  reference: string;
+  date: string;
+  amount: number;
+  currency: string;
+  status: "upcoming" | "completed" | "in-transit" | "delivered" | "cancelled";
+}

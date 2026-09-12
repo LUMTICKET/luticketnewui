@@ -1,4 +1,4 @@
-import type { BusRoute, Country, EventListing } from "./types";
+import type { BusRoute, Country, CustomerBooking, EventListing } from "./types";
 
 export const countries: Country[] = [
   { code: "MW", name: "Malawi", currency: "MWK", flag: "🇲🇼", live: true },
@@ -176,5 +176,52 @@ export const howItWorks = [
     step: "04",
     title: "Travel, attend, track",
     body: "Scan in at boarding or the gate, and track parcels in real time until they're signed for.",
+  },
+];
+
+export const sampleBookings: CustomerBooking[] = [
+  {
+    id: "bk1",
+    kind: "bus",
+    title: "Lilongwe → Blantyre",
+    detail: "AXA Coach · Seats 1A, 1B",
+    reference: "LMT-R1-2029",
+    date: "2026-09-20",
+    amount: 36000,
+    currency: "MWK",
+    status: "upcoming",
+  },
+  {
+    id: "bk2",
+    kind: "event",
+    title: "Blantyre Comedy Night",
+    detail: "2× General Admission",
+    reference: "LMT-EVT-212",
+    date: "2026-09-19",
+    amount: 24000,
+    currency: "MWK",
+    status: "upcoming",
+  },
+  {
+    id: "bk3",
+    kind: "parcel",
+    title: "Parcel to Blantyre",
+    detail: "Sent to Grace Mvula",
+    reference: "LMT-PCL-20481",
+    date: "2026-09-11",
+    amount: 6500,
+    currency: "MWK",
+    status: "in-transit",
+  },
+  {
+    id: "bk4",
+    kind: "bus",
+    title: "Blantyre → Mzuzu",
+    detail: "Nyasa Express · Seat 12C",
+    reference: "LMT-R2-1187",
+    date: "2026-08-14",
+    amount: 25000,
+    currency: "MWK",
+    status: "completed",
   },
 ];
