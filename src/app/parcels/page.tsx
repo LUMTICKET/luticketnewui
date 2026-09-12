@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { SearchBand } from "@/components/search/SearchBand";
 import { ModuleSearchBar } from "@/components/search/ModuleSearchBar";
@@ -69,6 +70,13 @@ export default async function ParcelsPage(props: PageProps<"/parcels">) {
             sample.
           </p>
         )}
+
+        <p className="mt-6 text-sm text-ink-muted">
+          Need to send a parcel instead?{" "}
+          <Link href="/parcels/send" className="font-semibold text-navy-950 hover:text-gold-600">
+            Register one here →
+          </Link>
+        </p>
       </div>
     </div>
   );

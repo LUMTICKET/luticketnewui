@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { countries } from "@/lib/data";
 
 type Module = "bus" | "events" | "parcel";
 type TripType = "oneway" | "return";
+type ParcelIntent = "track" | "send";
 
 const fieldBase =
   "h-13 w-full rounded-xl border border-line bg-surface pl-10 pr-3.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-navy-400";
@@ -50,6 +51,7 @@ export function ModuleSearchBar({
   const [eventQuery, setEventQuery] = useState(defaultQuery);
   const [eventCountry, setEventCountry] = useState(defaultCountry);
   const [trackingNo, setTrackingNo] = useState(defaultRef);
+  const [parcelIntent, setParcelIntent] = useState<ParcelIntent>("track");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -267,32 +269,69 @@ export function ModuleSearchBar({
         )}
 
         {module === "parcel" && (
-          <div className="flex flex-wrap gap-3">
-            <div className="relative min-w-[220px] flex-1 basis-72">
-              <label className="sr-only" htmlFor="tracking-no">
-                Parcel tracking number
-              </label>
-              <span className={iconWrapClasses}>
-                <SearchIcon />
-              </span>
-              <input
-                id="tracking-no"
-                ref={firstFieldRef}
-                className={fieldBase}
-                placeholder="Enter your parcel tracking number"
-                value={trackingNo}
-                onChange={(e) => setTrackingNo(e.target.value)}
-              />
+          <div className="flex flex-col gap-3">
+            <div role="radiogroup" aria-label="Parcel action" className="flex gap-1">
+              {(
+                [
+                  { id: "track", label: "Track a parcel" },
+                  { id: "send", label: "Send a parcel" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={parcelIntent === opt.id}
+                  onClick={() => setParcelIntent(opt.id)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    parcelIntent === opt.id
+                      ? "bg-navy-950 text-white"
+                      : "bg-surface-alt text-ink-muted hover:text-navy-950"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
 
-            <Button
-              type="submit"
-              variant="accent"
-              size="lg"
-              className="w-full sm:w-auto sm:px-8"
-            >
-              Track
-            </Button>
+            {parcelIntent === "track" ? (
+              <div className="flex flex-wrap gap-3">
+                <div className="relative min-w-[220px] flex-1 basis-72">
+                  <label className="sr-only" htmlFor="tracking-no">
+                    Parcel tracking number
+                  </label>
+                  <span className={iconWrapClasses}>
+                    <SearchIcon />
+                  </span>
+                  <input
+                    id="tracking-no"
+                    ref={firstFieldRef}
+                    className={fieldBase}
+                    placeholder="Enter your parcel tracking number"
+                    value={trackingNo}
+                    onChange={(e) => setTrackingNo(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="accent"
+                  size="lg"
+                  className="w-full sm:w-auto sm:px-8"
+                >
+                  Track
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-alt px-4 py-3">
+                <p className="text-sm text-ink-muted">
+                  Register sender, recipient, and item details to get a quote.
+                </p>
+                <LinkButton href="/parcels/send" variant="accent" size="md">
+                  Continue
+                </LinkButton>
+              </div>
+            )}
           </div>
         )}
       </form>

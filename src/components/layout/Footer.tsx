@@ -8,7 +8,7 @@ const columns = [
     links: [
       { href: "/bus", label: "Bus tickets" },
       { href: "/events", label: "Events" },
-      { href: "/parcels", label: "Send a parcel" },
+      { href: "/parcels/send", label: "Send a parcel" },
       { href: "/bookings", label: "Manage my bookings" },
     ],
   },
