@@ -2,7 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import Link from "next/link";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { countries } from "@/lib/data";
 import {
@@ -109,14 +110,14 @@ export default function DashboardPage() {
 
   if (state === "loading") {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-5xl items-center justify-center px-4">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <p className="text-sm text-ink-muted">Loading your dashboard…</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
@@ -323,32 +324,44 @@ export default function DashboardPage() {
             </dl>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-dashed border-line p-3 text-center">
+              <Link
+                href="/dashboard/team"
+                className="rounded-xl border border-line p-3 text-center hover:border-navy-300"
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
                   Team
                 </p>
-                <p className="mt-1 text-xs text-ink-muted">Coming soon</p>
-              </div>
-              <div className="rounded-xl border border-dashed border-line p-3 text-center">
+                <p className="mt-1 text-xs text-navy-950">Manage roles →</p>
+              </Link>
+              <Link
+                href="/dashboard/audit"
+                className="rounded-xl border border-line p-3 text-center hover:border-navy-300"
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
                   Audit log
                 </p>
-                <p className="mt-1 text-xs text-ink-muted">Coming soon</p>
-              </div>
+                <p className="mt-1 text-xs text-navy-950">View activity →</p>
+              </Link>
             </div>
           </div>
 
           <div className="rounded-2xl border border-line p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-navy-950">Your events</h2>
-              <Badge tone="neutral">{events.length}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge tone="neutral">{events.length}</Badge>
+                <LinkButton href="/dashboard/events/new" variant="accent" size="sm">
+                  Create event
+                </LinkButton>
+              </div>
             </div>
 
             {events.length === 0 ? (
               <p className="mt-4 text-sm text-ink-muted">
-                No events yet. Publishing an event requires a completed payment
-                step — this flow is wired up in the API but not yet built into
-                this dashboard.
+                No events yet.{" "}
+                <Link href="/dashboard/events/new" className="font-semibold text-navy-950">
+                  Publish your first event →
+                </Link>
               </p>
             ) : (
               <ul className="mt-4 flex flex-col gap-3">

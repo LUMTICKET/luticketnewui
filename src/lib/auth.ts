@@ -115,6 +115,136 @@ export async function listEvents(token: string, businessProfileId: number | stri
   return result ?? [];
 }
 
+export interface PaymentRecord {
+  id: number | string;
+  [key: string]: unknown;
+}
+
+export function simulatePayment(
+  token: string,
+  payload: {
+    businessProfileId: number | string;
+    amount: number;
+    currency: string;
+    method: "card" | "tnm" | "airtel";
+  },
+) {
+  return authorizedRequest<PaymentRecord>("/api/payments/simulate", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface TicketTierInput {
+  name: string;
+  price: number;
+  currency: string;
+  capacity: number;
+  perks: string[];
+}
+
+export interface CreateEventInput {
+  businessProfileId: number | string;
+  paymentId: number | string;
+  title: string;
+  subtitle?: string;
+  category: "event" | "bus" | "flight" | "tourism";
+  organizer?: string;
+  description?: string;
+  location: string;
+  startsAt: string;
+  maxPerUser?: number;
+  tags?: string[];
+  tickets: TicketTierInput[];
+}
+
+export function createEventListing(token: string, payload: CreateEventInput) {
+  return authorizedRequest<EventSummary>("/api/events", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface TeamRole {
+  id: number | string;
+  name: string;
+  description?: string;
+  permissions: string[];
+  [key: string]: unknown;
+}
+
+export async function listTeamRoles(token: string, businessProfileId: number | string) {
+  const result = await authorizedRequest<TeamRole[]>(
+    `/api/team/roles?businessProfileId=${businessProfileId}`,
+    token,
+  );
+  return result ?? [];
+}
+
+export function createTeamRole(
+  token: string,
+  payload: {
+    businessProfileId: number | string;
+    name: string;
+    description?: string;
+    permissions: string[];
+  },
+) {
+  return authorizedRequest<TeamRole>("/api/team/roles", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface TeamInvitation {
+  id: number | string;
+  email: string;
+  name: string;
+  status?: string;
+  roleId?: number | string;
+  [key: string]: unknown;
+}
+
+export async function listTeamInvitations(token: string, businessProfileId: number | string) {
+  const result = await authorizedRequest<TeamInvitation[]>(
+    `/api/team/invitations?businessProfileId=${businessProfileId}`,
+    token,
+  );
+  return result ?? [];
+}
+
+export function createTeamInvitation(
+  token: string,
+  payload: {
+    businessProfileId: number | string;
+    email: string;
+    name: string;
+    roleId?: number | string;
+    role?: string;
+    expiresInDays?: number;
+  },
+) {
+  return authorizedRequest<TeamInvitation>("/api/team/invitations", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface AuditEntry {
+  id: number | string;
+  action: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+export async function listAuditLog(token: string, businessProfileId: number | string) {
+  const result = await authorizedRequest<AuditEntry[]>(
+    `/api/audit?businessProfileId=${businessProfileId}`,
+    token,
+  );
+  return result ?? [];
+}
+
 export async function logoutSession(token: string) {
   try {
     await fetch(`${getApiBaseUrl()}/api/auth/logout`, {

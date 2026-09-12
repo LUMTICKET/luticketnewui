@@ -141,7 +141,7 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
                     </p>
                   </div>
                   <Link
-                    href={`/bus/${route.id}`}
+                    href={`/bus/${route.id}?passengers=${passengers}`}
                     className="inline-flex h-10 items-center justify-center rounded-full bg-navy-950 px-5 text-sm font-semibold text-white hover:bg-navy-800"
                   >
                     Select seats
