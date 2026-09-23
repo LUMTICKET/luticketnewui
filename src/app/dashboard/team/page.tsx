@@ -38,10 +38,11 @@ export default function TeamPage() {
   async function handleCreateRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !profile) return;
+    const form = event.currentTarget;
     setError("");
     setBusy(true);
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const created = await createTeamRole(token, {
         businessProfileId: profile.id,
         name: String(formData.get("name") || ""),
@@ -52,7 +53,7 @@ export default function TeamPage() {
           .filter(Boolean),
       });
       if (created) setRoles((prev) => [...prev, created]);
-      event.currentTarget.reset();
+      form.reset();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Could not create role.");
     } finally {
@@ -63,10 +64,11 @@ export default function TeamPage() {
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !profile) return;
+    const form = event.currentTarget;
     setError("");
     setBusy(true);
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const roleId = formData.get("roleId");
       const created = await createTeamInvitation(token, {
         businessProfileId: profile.id,
@@ -76,7 +78,7 @@ export default function TeamPage() {
         expiresInDays: Number(formData.get("expiresInDays") || 7),
       });
       if (created) setInvitations((prev) => [...prev, created]);
-      event.currentTarget.reset();
+      form.reset();
     } catch (inviteError) {
       setError(inviteError instanceof Error ? inviteError.message : "Could not send invitation.");
     } finally {
