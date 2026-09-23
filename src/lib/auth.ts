@@ -307,17 +307,6 @@ export function saveAuthSession(session: AuthSession, remember = true) {
   storage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-export function getAuthSession() {
-  const stored = window.localStorage.getItem("lumiticket.auth") || window.sessionStorage.getItem("lumiticket.auth");
-  if (!stored) return null;
-
-  try {
-    return JSON.parse(stored) as AuthSession;
-  } catch {
-    return null;
-  }
-}
-
 export async function apiRequest<T>(path: string, options: RequestInit = {}) {
   const session = getAuthSession();
   const headers = new Headers(options.headers);

@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/Badge";
 import { useDashboardSession } from "@/lib/useDashboardSession";
 import {
   createTeamInvitation,
-  createTeamRole,
   getBusinessProfile,
   listTeamInvitations,
   listTeamRoles,
@@ -35,31 +34,6 @@ export default function TeamPage() {
     })();
   }, [ready, token]);
 
-  async function handleCreateRole(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || !profile) return;
-    setError("");
-    setBusy(true);
-    try {
-      const formData = new FormData(event.currentTarget);
-      const created = await createTeamRole(token, {
-        businessProfileId: profile.id,
-        name: String(formData.get("name") || ""),
-        description: String(formData.get("description") || ""),
-        permissions: String(formData.get("permissions") || "")
-          .split(",")
-          .map((p) => p.trim())
-          .filter(Boolean),
-      });
-      if (created) setRoles((prev) => [...prev, created]);
-      event.currentTarget.reset();
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Could not create role.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !profile) return;
@@ -73,6 +47,7 @@ export default function TeamPage() {
         email: String(formData.get("email") || ""),
         name: String(formData.get("name") || ""),
         ...(roleId ? { roleId: String(roleId) } : {}),
+        expiresInDays: Number(formData.get("expiresInDays") || 7),
       });
       if (created) setInvitations((prev) => [...prev, created]);
       event.currentTarget.reset();
@@ -104,7 +79,7 @@ export default function TeamPage() {
       <h1 className="text-2xl font-bold text-navy-950">Team</h1>
       <p className="mt-1 text-sm text-ink-muted">
         Every staff account is individually attributable — shared logins aren&apos;t
-        permitted. Create a role, then invite people into it.
+        permitted. Invite people into an existing role.
       </p>
 
       {error && (
@@ -136,23 +111,6 @@ export default function TeamPage() {
             ))}
           </ul>
 
-          <form onSubmit={handleCreateRole} className="mt-6 flex flex-col gap-3 border-t border-line pt-6">
-            <div>
-              <label htmlFor="role-name" className="text-sm font-medium text-ink">Role name</label>
-              <input id="role-name" name="name" required className="mt-1.5 h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-navy-400" placeholder="Booking Officer" />
-            </div>
-            <div>
-              <label htmlFor="role-description" className="text-sm font-medium text-ink">Description</label>
-              <input id="role-description" name="description" className="mt-1.5 h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-navy-400" placeholder="Processes bookings and cancellations" />
-            </div>
-            <div>
-              <label htmlFor="role-permissions" className="text-sm font-medium text-ink">Permissions (comma separated)</label>
-              <input id="role-permissions" name="permissions" className="mt-1.5 h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-navy-400" placeholder="read, write, invite" />
-            </div>
-            <Button type="submit" variant="primary" size="md" disabled={busy}>
-              Create role
-            </Button>
-          </form>
         </div>
 
         <div className="rounded-2xl border border-line p-6">
@@ -192,6 +150,10 @@ export default function TeamPage() {
                   <option key={role.id} value={role.id}>{role.name}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label htmlFor="invite-expires" className="text-sm font-medium text-ink">Expires in days</label>
+              <input id="invite-expires" name="expiresInDays" type="number" min="1" max="30" defaultValue="7" required className="mt-1.5 h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-navy-400" />
             </div>
             <Button type="submit" variant="accent" size="md" disabled={busy}>
               Send invitation
