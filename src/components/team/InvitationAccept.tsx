@@ -5,7 +5,12 @@ import Link from "next/link";
 import { apiRequest, getAuthSession, publicApiRequest } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 
-type InvitationPreview = { email?: string; name?: string; role?: { name?: string } | string; businessName?: string };
+type InvitationPreview = {
+  email?: string;
+  name?: string;
+  role?: { name?: string } | string;
+  businessName?: string;
+};
 
 export function InvitationAccept({ token }: { token: string }) {
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
@@ -16,23 +21,16 @@ export function InvitationAccept({ token }: { token: string }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
-    // Check auth status on mount (avoids hydration mismatches)
+    // Check if user is logged in
     setSignedIn(Boolean(getAuthSession()));
 
+    // Fetch invitation details (public route)
     publicApiRequest<InvitationPreview>(`/api/team/invitations/${encodeURIComponent(token)}`)
-      .then((data) => {
-        setPreview(data);
-      })
-      .catch((requestError) => {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "This invitation is no longer available."
-        );
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .then((data) => setPreview(data))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "This invitation is no longer available.")
+      )
+      .finally(() => setLoading(false));
   }, [token]);
 
   async function acceptInvitation() {
@@ -43,19 +41,14 @@ export function InvitationAccept({ token }: { token: string }) {
         method: "POST",
       });
       setAccepted(true);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to accept invitation."
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to accept invitation.");
     } finally {
       setBusy(false);
     }
   }
 
-  const roleName =
-    typeof preview?.role === "string" ? preview.role : preview?.role?.name;
+  const roleName = typeof preview?.role === "string" ? preview.role : preview?.role?.name;
 
   return (
     <div className="mx-auto flex min-h-[65vh] max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
@@ -66,9 +59,7 @@ export function InvitationAccept({ token }: { token: string }) {
         Join {preview?.businessName || "this business"}
       </h1>
 
-      {loading && (
-        <p className="mt-6 text-sm text-ink-muted">Loading invitation details...</p>
-      )}
+      {loading && <p className="mt-6 text-sm text-ink-muted">Loading invitation details…</p>}
 
       {error && (
         <p role="alert" className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -79,9 +70,7 @@ export function InvitationAccept({ token }: { token: string }) {
       {preview && !accepted && (
         <div className="mt-6 rounded-2xl border border-line p-6">
           <p className="text-sm text-ink-muted">This invitation is for</p>
-          <p className="mt-1 font-semibold text-navy-950">
-            {preview.name || preview.email}
-          </p>
+          <p className="mt-1 font-semibold text-navy-950">{preview.name || preview.email}</p>
           <p className="mt-1 text-sm text-ink-muted">
             {preview.email}
             {roleName ? ` · ${roleName}` : ""}
@@ -95,7 +84,7 @@ export function InvitationAccept({ token }: { token: string }) {
         </p>
       )}
 
-      {/* Render options once loading finishes */}
+      {/* RENDER BUTTONS */}
       {!loading && !accepted && (
         signedIn ? (
           <Button
@@ -108,6 +97,7 @@ export function InvitationAccept({ token }: { token: string }) {
             {busy ? "Accepting..." : "Accept invitation"}
           </Button>
         ) : (
+          /* Forces login and sends them right back to this exact page after logging in */
           <Link
             href={`/login?next=${encodeURIComponent(`/invitations/${token}`)}`}
             className="mt-6 inline-flex h-13 w-full items-center justify-center rounded-full bg-navy-950 px-6 text-base font-semibold text-white"
