@@ -58,7 +58,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       });
 
       saveAuthSession(session, isSignup || remember);
-      router.push("/");
+      const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+      router.push(next || "/");
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Authentication failed.");

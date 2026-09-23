@@ -100,6 +100,15 @@ export default function BusinessPage() {
             Start onboarding
           </LinkButton>
         </div>
+        <div className="mt-5 flex flex-col items-start gap-3 rounded-2xl border border-line p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-navy-950">Already verified?</h2>
+            <p className="mt-1 text-sm text-ink-muted">Manage roles and invite your business team from the API-backed workspace.</p>
+          </div>
+          <LinkButton href="/team" variant="outline" size="md" className="shrink-0">
+            Open team workspace
+          </LinkButton>
+        </div>
       </section>
     </div>
   );
