@@ -115,6 +115,13 @@ export function Header() {
                     For business
                   </Link>
                   <Link
+                    href="/team"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
+                  >
+                    Team workspace
+                  </Link>
+                  <Link
                     href="/help"
                     onClick={() => setMenuOpen(false)}
                     className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"

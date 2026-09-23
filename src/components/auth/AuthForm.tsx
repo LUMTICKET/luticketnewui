@@ -32,7 +32,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         profile.picture || "",
       );
       saveAuthSession(session);
-      router.push("/dashboard");
+      router.push("/");
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Google sign-in failed.");
@@ -58,7 +58,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       });
 
       saveAuthSession(session, isSignup || remember);
-      router.push("/dashboard");
+      const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+      router.push(next || "/");
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Authentication failed.");

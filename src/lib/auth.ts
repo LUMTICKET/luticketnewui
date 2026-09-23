@@ -31,7 +31,7 @@ export interface BusinessProfile {
 const SESSION_KEY = "lumiticket.auth";
 
 export function getApiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_API_URL || "https://api-gamma-mocha-qn31xem8po.vercel.app").replace(/\/$/, "");
 }
 
 export function getAuthSession(): AuthSession | null {
@@ -305,4 +305,48 @@ export function googleAuth(idToken: string, email: string, name: string, avatar:
 export function saveAuthSession(session: AuthSession, remember = true) {
   const storage = remember ? window.localStorage : window.sessionStorage;
   storage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+export function getAuthSession() {
+  const stored = window.localStorage.getItem("lumiticket.auth") || window.sessionStorage.getItem("lumiticket.auth");
+  if (!stored) return null;
+
+  try {
+    return JSON.parse(stored) as AuthSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRequest<T>(path: string, options: RequestInit = {}) {
+  const session = getAuthSession();
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  if (session?.token) headers.set("Authorization", `Bearer ${session.token}`);
+
+  let response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers });
+  if (response.status === 401 && session?.refreshToken) {
+    const refreshResponse = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: session.refreshToken }),
+    });
+    if (refreshResponse.ok) {
+      const refreshed = (await refreshResponse.json()) as AuthSession;
+      saveAuthSession(refreshed, Boolean(window.localStorage.getItem("lumiticket.auth")));
+      headers.set("Authorization", `Bearer ${refreshed.token}`);
+      response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers });
+    }
+  }
+
+  const payload = (await response.json().catch(() => null)) as (T & { message?: string; error?: string }) | null;
+  if (!response.ok) throw new Error(payload?.message || payload?.error || `Request failed (${response.status}).`);
+  return payload as T;
+}
+
+export async function publicApiRequest<T>(path: string) {
+  const response = await fetch(`${getApiBaseUrl()}${path}`);
+  const payload = (await response.json().catch(() => null)) as (T & { message?: string; error?: string }) | null;
+  if (!response.ok) throw new Error(payload?.message || payload?.error || `Request failed (${response.status}).`);
+  return payload as T;
 }
