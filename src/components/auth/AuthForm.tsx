@@ -1,45 +1,116 @@
 "use client";
 
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { countries } from "@/lib/data";
-import { authRequest, decodeJwtPayload, googleAuth, saveAuthSession, type AuthSession } from "@/lib/auth";
+import {
+  authRequest,
+  clearAuthSession,
+  decodeJwtPayload,
+  getCurrentUser,
+  googleAuth,
+  saveAuthSession,
+  type AuthSession,
+  type AuthUser,
+} from "@/lib/auth";
+import {
+  PUBLIC_ROLES,
+  ROLES,
+  getLastRole,
+  resolveRole,
+  roleLanding,
+  safeNext,
+  saveRole,
+  saveSignupDraft,
+  staffAccess,
+  type AccountRole,
+} from "@/lib/roles";
 import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
+import { RoleIcon, RoleSelector } from "@/components/auth/RoleSelector";
 
 type AuthMode = "login" | "signup";
 
-export function AuthForm({ mode }: { mode: AuthMode }) {
+const inputClasses =
+  "mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400";
+
+export function AuthForm({
+  mode,
+  initialRole,
+  portal,
+  next,
+}: {
+  mode: AuthMode;
+  /** Role pre-selected from `?role=`; when absent the last-used role is restored. */
+  initialRole?: AccountRole;
+  portal?: "staff";
+  next?: string | null;
+}) {
   const router = useRouter();
   const isSignup = mode === "signup";
+  const isStaffPortal = portal === "staff" && !isSignup;
+  const [role, setRole] = useState<AccountRole>(isStaffPortal ? "staff" : (initialRole ?? "customer"));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [remember, setRemember] = useState(true);
 
-  const handleGoogleIdToken = useCallback(async (idToken: string) => {
-    setError("");
-    setBusy(true);
+  useEffect(() => {
+    if (initialRole || isStaffPortal || isSignup) return;
+    const last = getLastRole();
+    // Returning users see the workspace they used last; read after mount because it lives in localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (last) setRole(last);
+  }, [initialRole, isStaffPortal, isSignup]);
 
-    try {
-      const profile = decodeJwtPayload(idToken);
-      if (!profile.email) throw new Error("No email found in Google account.");
+  const finish = useCallback(
+    async (session: AuthSession, keep: boolean, chosen: AccountRole) => {
+      saveAuthSession(session, keep);
 
-      const session = await googleAuth(
-        idToken,
-        profile.email,
-        profile.name || profile.given_name || "",
-        profile.picture || "",
-      );
-      saveAuthSession(session);
-      router.push("/");
+      let user: AuthUser | null = null;
+      try {
+        user = await getCurrentUser(session.token);
+      } catch {
+        user = null;
+      }
+
+      if (chosen === "staff" && staffAccess(user) === "denied") {
+        clearAuthSession();
+        throw new Error("This account isn't provisioned for staff access. Ask an administrator to enable it.");
+      }
+
+      const finalRole = resolveRole(chosen, user);
+      saveRole(finalRole, keep);
+      router.push(safeNext(next) ?? roleLanding(finalRole));
       router.refresh();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Google sign-in failed.");
-    } finally {
-      setBusy(false);
-    }
-  }, [router]);
+    },
+    [next, router],
+  );
+
+  const handleGoogleIdToken = useCallback(
+    async (idToken: string) => {
+      setError("");
+      setBusy(true);
+
+      try {
+        const profile = decodeJwtPayload(idToken);
+        if (!profile.email) throw new Error("No email found in Google account.");
+
+        const session = await googleAuth(
+          idToken,
+          profile.email,
+          profile.name || profile.given_name || "",
+          profile.picture || "",
+        );
+        await finish(session, true, role);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Google sign-in failed.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [finish, role],
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,10 +128,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         }),
       });
 
-      saveAuthSession(session, isSignup || remember);
-      const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
-      router.push(next || "/");
-      router.refresh();
+      if (isSignup && ROLES[role].business) {
+        saveSignupDraft({ role, businessName: String(formData.get("businessName") || "").trim() });
+      }
+      await finish(session, isSignup || remember, role);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Authentication failed.");
     } finally {
@@ -68,9 +139,42 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     }
   }
 
+  const config = ROLES[role];
+
   return (
     <>
-      <div className="mt-8">
+      {isStaffPortal ? (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-surface-alt p-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-950 text-white">
+            <RoleIcon role="staff" size={18} />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-navy-950">Lumina staff console</p>
+            <p className="mt-0.5 text-xs leading-snug text-ink-muted">
+              Internal access for system administration and customer support. Staff accounts are
+              provisioned by an administrator.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6">
+          <RoleSelector
+            value={role}
+            onChange={setRole}
+            roles={PUBLIC_ROLES}
+            label={isSignup ? "I want to use Lumiticket as a…" : "Sign in as…"}
+          />
+          <p className="mt-2.5 text-xs text-ink-muted">
+            {isSignup
+              ? config.business
+                ? "You'll verify your business (KYC/KYB) after creating your account, before going live."
+                : "Your account is free — you can also buy tickets as a guest without one."
+              : `You'll land in: ${config.workspace}.`}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-6">
         <SocialAuthButtons
           label={isSignup ? "Sign up" : "Log in"}
           onGoogle={handleGoogleIdToken}
@@ -90,14 +194,23 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {isSignup && (
           <div>
             <label htmlFor="name" className="text-sm font-medium text-ink">Full name</label>
-            <input id="name" name="name" type="text" required autoComplete="name" className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400" placeholder="Chikondi Banda" />
+            <input id="name" name="name" type="text" required autoComplete="name" className={inputClasses} placeholder="Chikondi Banda" />
+          </div>
+        )}
+
+        {isSignup && config.business && (
+          <div>
+            <label htmlFor="businessName" className="text-sm font-medium text-ink">
+              Business or trading name
+            </label>
+            <input id="businessName" name="businessName" type="text" required autoComplete="organization" className={inputClasses} placeholder="Nyasa Express Ltd" />
           </div>
         )}
 
         {isSignup && (
           <div>
             <label htmlFor="country" className="text-sm font-medium text-ink">Country</label>
-            <select id="country" name="country" required className="mt-1.5 h-12 w-full rounded-xl border border-line bg-surface px-3.5 text-sm focus:border-navy-400" defaultValue={countries[0].code}>
+            <select id="country" name="country" required className={`${inputClasses} bg-surface`} defaultValue={countries[0].code}>
               {countries.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name}</option>)}
             </select>
           </div>
@@ -105,12 +218,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
         <div>
           <label htmlFor="email" className="text-sm font-medium text-ink">Email or mobile number</label>
-          <input id="email" name="email" type="text" required autoComplete="username" className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400" placeholder="you@example.com" />
+          <input id="email" name="email" type="text" required autoComplete="username" className={inputClasses} placeholder="you@example.com" />
         </div>
 
         <div>
           <label htmlFor="password" className="text-sm font-medium text-ink">Password</label>
-          <input id="password" name="password" type="password" required minLength={8} autoComplete={isSignup ? "new-password" : "current-password"} className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400" placeholder={isSignup ? "At least 8 characters" : "••••••••"} />
+          <input id="password" name="password" type="password" required minLength={8} autoComplete={isSignup ? "new-password" : "current-password"} className={inputClasses} placeholder={isSignup ? "At least 8 characters" : "••••••••"} />
         </div>
 
         {!isSignup && (
@@ -130,10 +243,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           </label>
         )}
 
-        {error && <p id="auth-error" role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p id="auth-error" role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
 
         <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-2 w-full">
-          {busy ? "Please wait..." : isSignup ? "Create account" : "Log in"}
+          {busy ? "Please wait..." : isSignup ? `Create ${config.label.toLowerCase()} account` : `Sign in to ${config.workspace.toLowerCase()}`}
         </Button>
       </form>
     </>

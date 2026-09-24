@@ -1,4 +1,4 @@
-const CACHE_VERSION = "lumiticket-v1";
+const CACHE_VERSION = "lumiticket-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = ["/", OFFLINE_URL, "/manifest.webmanifest"];
 

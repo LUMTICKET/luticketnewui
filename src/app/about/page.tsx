@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 import { countries } from "@/lib/data";
+import { LogoFull } from "@/components/layout/Logo";
 
 export const metadata = {
   title: "About Lumina Holdings — Lumiticket",
@@ -46,7 +47,8 @@ export default function AboutPage() {
   return (
     <div>
       <section className="bg-navy-950">
-        <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-5xl flex-col items-start gap-10 px-4 py-16 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+          <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gold-400">
             Lumina Holdings Ltd
           </p>
@@ -60,6 +62,8 @@ export default function AboutPage() {
             fully connected, so new operators, agents, and countries can be
             added without rebuilding the core.
           </p>
+          </div>
+          <LogoFull tone="light" width={220} className="shrink-0" />
         </div>
       </section>
 

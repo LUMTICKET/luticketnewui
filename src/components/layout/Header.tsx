@@ -8,11 +8,14 @@ import { ModuleNav } from "./ModuleNav";
 import { CountrySwitcher } from "./CountrySwitcher";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { clearAuthSession, getAuthSession, logoutSession } from "@/lib/auth";
+import { ROLES, getStoredRole, roleLanding, type AccountRole } from "@/lib/roles";
+import { workspaceHref, isWorkspaceRole } from "@/lib/workspace-nav";
 
 export function Header() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [role, setRole] = useState<AccountRole | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +25,7 @@ export function Header() {
     // mismatch between the server-rendered markup and the client render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoggedIn(Boolean(getAuthSession()));
+    setRole(getStoredRole());
   }, []);
 
   useEffect(() => {
@@ -40,6 +44,7 @@ export function Header() {
     if (session) await logoutSession(session.token);
     clearAuthSession();
     setLoggedIn(false);
+    setRole(null);
     setLoggingOut(false);
     setMenuOpen(false);
     router.push("/");
@@ -73,7 +78,7 @@ export function Header() {
           <div className="relative" ref={menuRef}>
             <button
               type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-line"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-navy-950"
               aria-label="Open menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
@@ -82,14 +87,14 @@ export function Header() {
                 {menuOpen ? (
                   <path
                     d="M3 3l12 12M15 3L3 15"
-                    stroke="#0B1220"
+                    stroke="currentColor"
                     strokeWidth="1.6"
                     strokeLinecap="round"
                   />
                 ) : (
                   <path
                     d="M2 4.5h14M2 9h14M2 13.5h14"
-                    stroke="#0B1220"
+                    stroke="currentColor"
                     strokeWidth="1.6"
                     strokeLinecap="round"
                   />
@@ -114,13 +119,15 @@ export function Header() {
                   >
                     For business
                   </Link>
-                  <Link
-                    href="/team"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
-                  >
-                    Team workspace
-                  </Link>
+                  {loggedIn && isWorkspaceRole(role) && ROLES[role].business && (
+                    <Link
+                      href={workspaceHref(role, "team")}
+                      onClick={() => setMenuOpen(false)}
+                      className="rounded-lg px-1 py-2 text-sm font-medium text-ink hover:bg-surface-alt"
+                    >
+                      Team
+                    </Link>
+                  )}
                   <Link
                     href="/help"
                     onClick={() => setMenuOpen(false)}
@@ -141,13 +148,13 @@ export function Header() {
                   {loggedIn ? (
                     <>
                       <LinkButton
-                        href="/dashboard"
+                        href={roleLanding(role)}
                         variant="accent"
                         size="sm"
                         className="flex-1"
                         onClick={() => setMenuOpen(false)}
                       >
-                        Dashboard
+                        {isWorkspaceRole(role) ? "My workspace" : "My account"}
                       </LinkButton>
                       <Button
                         type="button"

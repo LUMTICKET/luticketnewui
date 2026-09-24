@@ -74,7 +74,7 @@ function StarIcon() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
       <path
         d="M7 1l1.8 3.7 4.1.6-3 2.9.7 4.1L7 10.4l-3.6 1.9.7-4.1-3-2.9 4.1-.6L7 1z"
-        fill="#E8A33D"
+        fill="currentColor" className="text-gold-500"
       />
     </svg>
   );

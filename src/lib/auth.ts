@@ -1,3 +1,5 @@
+import { clearStoredRole } from "@/lib/roles";
+
 export interface AuthSession {
   token: string;
   refreshToken: string;
@@ -51,6 +53,32 @@ export function clearAuthSession() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SESSION_KEY);
   window.sessionStorage.removeItem(SESSION_KEY);
+  clearStoredRole();
+}
+
+/** Thrown for any non-2xx API response; `status` lets callers tell an expired session (401) from other failures. */
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function refreshSession(session: AuthSession): Promise<AuthSession | null> {
+  const response = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken: session.refreshToken }),
+  }).catch(() => null);
+  if (!response || !response.ok) return null;
+
+  const refreshed = (await response.json().catch(() => null)) as AuthSession | null;
+  if (!refreshed?.token) return null;
+  saveAuthSession(refreshed, Boolean(window.localStorage.getItem(SESSION_KEY)));
+  return refreshed;
 }
 
 async function authorizedRequest<T>(
@@ -58,14 +86,23 @@ async function authorizedRequest<T>(
   token: string,
   init: RequestInit = {},
 ): Promise<T | null> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...(init.headers as Record<string, string> | undefined),
-      Authorization: `Bearer ${token}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-    },
-  });
+  const send = (bearer: string) =>
+    fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        ...(init.headers as Record<string, string> | undefined),
+        Authorization: `Bearer ${bearer}`,
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+      },
+    });
+
+  // Prefer the freshest stored token; on a 401 rotate the refresh token once and retry.
+  const session = getAuthSession();
+  let response = await send(session?.token ?? token);
+  if (response.status === 401 && session?.refreshToken) {
+    const refreshed = await refreshSession(session);
+    if (refreshed) response = await send(refreshed.token);
+  }
 
   if (response.status === 404) return null;
 
@@ -74,7 +111,7 @@ async function authorizedRequest<T>(
     | null;
 
   if (!response.ok) {
-    throw new Error(payload?.message || payload?.error || "Request failed.");
+    throw new ApiError(payload?.message || payload?.error || "Request failed.", response.status);
   }
 
   return payload as T;

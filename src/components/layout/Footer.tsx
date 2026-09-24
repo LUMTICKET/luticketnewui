@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "./Logo";
+import { Logo, LogoWordmark } from "./Logo";
 import { countries } from "@/lib/data";
 
 const columns = [
@@ -50,8 +50,12 @@ export function Footer() {
             <Logo tone="light" />
             <p className="mt-4 max-w-xs text-sm text-navy-300">
               One platform for bus travel, parcels, and event tickets across
-              the SADC region. A Lumina Holdings company.
+              the SADC region.
             </p>
+            <div className="mt-4 flex items-center gap-3 text-xs text-navy-300">
+              <span>A company of</span>
+              <LogoWordmark tone="light" width={112} />
+            </div>
             <div className="mt-6 flex flex-wrap gap-2">
               {countries.map((c) => (
                 <span
