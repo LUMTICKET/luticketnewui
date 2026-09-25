@@ -13,7 +13,8 @@ import {
   logoutSession,
   type AuthUser,
 } from "@/lib/auth";
-import { ROLES, getStoredRole, roleLanding, saveRole, type AccountRole } from "@/lib/roles";
+import { ROLES, businessTypeFromServer, getStoredRole, roleLanding, saveRole, type AccountRole } from "@/lib/roles";
+import { workspaceForBusinessType } from "@/lib/business-types";
 import { sampleBookings } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
 
@@ -31,6 +32,12 @@ const statusTone = {
   delivered: "success",
   cancelled: "error",
 } as const;
+
+/** Display name for the stored business type; falls back to prettified slug. */
+function typeDisplayName(slug: string, user: AuthUser | null) {
+  const stored = user?.businessType as { name?: string } | null | undefined;
+  return stored?.name ?? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function AccountHome() {
   const router = useRouter();
@@ -65,6 +72,17 @@ export function AccountHome() {
       setHomeRole(stored ?? "customer");
       setUser(me);
       setReady(true);
+
+      // Keep the workspace banner driven by the account of record: the business
+      // type stored on the user (users.business_type_id) wins over the last-used
+      // role in localStorage when the two disagree.
+      if (me) {
+        const serverWorkspace = workspaceForBusinessType(businessTypeFromServer(me));
+        if (serverWorkspace && serverWorkspace !== (stored ?? "customer")) {
+          saveRole(serverWorkspace, true);
+          setHomeRole(serverWorkspace);
+        }
+      }
     })();
 
     return () => {
@@ -94,6 +112,16 @@ export function AccountHome() {
         <p className="text-xs font-semibold uppercase tracking-wide text-gold-400">My account</p>
         <h1 className="mt-2 text-3xl font-bold">Hi{firstName ? `, ${firstName}` : ""}</h1>
         {user?.email && <p className="mt-2 text-navy-200">{user.email}</p>}
+        {(() => {
+          const linkedType = businessTypeFromServer(user);
+          if (!linkedType) return null;
+          return (
+            <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm">
+              <span className="h-2 w-2 rounded-full bg-gold-400" />
+              Business: {typeDisplayName(linkedType.slug, user)}
+            </p>
+          );
+        })()}
       </section>
 
       {otherWorkspace && (

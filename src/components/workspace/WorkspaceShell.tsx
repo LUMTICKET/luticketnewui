@@ -16,7 +16,7 @@ import {
   type AuthUser,
   type BusinessProfile,
 } from "@/lib/auth";
-import { ROLES, getStoredRole, roleLanding, saveRole, staffAccess, type AccountRole } from "@/lib/roles";
+import { ROLES, businessTypeFromServer, getStoredRole, resolveRole, roleLanding, saveRole, staffAccess, type AccountRole } from "@/lib/roles";
 import { WORKSPACE_NAV, workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { WorkspaceContext } from "./WorkspaceContext";
 
@@ -84,6 +84,18 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
       setToken(session.token);
       setUser(me);
       setState("ready");
+
+      // The account's stored businessType is the source of truth: a user who
+      // signed up as an event organizer but landed here via /bus-operator is
+      // redirected to their own dashboard instead of seeing the wrong workspace.
+      if (me && role !== "staff") {
+        const homeRole = resolveRole(role, me);
+        if (homeRole !== role) {
+          saveRole(homeRole, true);
+          router.replace(roleLanding(homeRole));
+          return;
+        }
+      }
 
       if (ROLES[role].business) {
         try {
