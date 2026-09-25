@@ -6,11 +6,13 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
   createEventListing,
+  getEvent,
   listEvents,
   simulatePayment,
   type EventSummary,
   type TicketTierInput,
 } from "@/lib/auth";
+import { formatPrice } from "@/lib/format";
 import { workspaceHref } from "@/lib/workspace-nav";
 import { Card, PageHeader, inputClass } from "../ui";
 import { ProfileGate } from "../shared";
@@ -72,13 +74,29 @@ function EventList({
   createHref: string;
 }) {
   const [events, setEvents] = useState<EventSummary[] | null>(null);
+  const [details, setDetails] = useState<Record<string, Awaited<ReturnType<typeof getEvent>>>>({});
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     listEvents(token, profileId)
-      .then((all) => {
-        if (!cancelled) setEvents(category ? all.filter((e) => e.category === category) : all);
+      .then(async (all) => {
+        const filtered = category ? all.filter((e) => e.category === category) : all;
+        if (!cancelled) setEvents(filtered);
+
+        // Pull each listing's ticket rows for real sold/remaining counts.
+        const loaded: Record<string, Awaited<ReturnType<typeof getEvent>>> = {};
+        await Promise.all(
+          filtered.map(async (event) => {
+            try {
+              const detail = await getEvent(token, event.id);
+              if (detail) loaded[String(event.id)] = detail;
+            } catch {
+              // Missing detail just hides the per-ticket stats for that listing.
+            }
+          }),
+        );
+        if (!cancelled) setDetails(loaded);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load your listings.");
@@ -104,16 +122,37 @@ function EventList({
 
   return (
     <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {events.map((item) => (
-        <li key={item.id} className="rounded-2xl border border-line bg-surface p-5">
-          <div className="flex items-start justify-between gap-3">
-            <p className="font-semibold text-navy-950">{item.title}</p>
-            <Badge tone="neutral">{item.category}</Badge>
-          </div>
-          <p className="mt-1 text-sm text-ink-muted">{item.location}</p>
-          <p className="mt-1 text-xs text-ink-faint">{item.startsAt ? new Date(item.startsAt).toLocaleString() : "—"}</p>
-        </li>
-      ))}
+      {events.map((item) => {
+        const tickets = details[String(item.id)]?.tickets ?? [];
+        const sold = tickets.reduce((sum, t) => sum + Math.max(t.capacity - t.remaining, 0), 0);
+        const capacity = tickets.reduce((sum, t) => sum + t.capacity, 0);
+        const minPrice = tickets.length > 0 ? Math.min(...tickets.map((t) => t.price)) : null;
+        return (
+          <li key={item.id} className="rounded-2xl border border-line bg-surface p-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-semibold text-navy-950">{item.title}</p>
+              <Badge tone="neutral">{item.category}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-ink-muted">{item.location}</p>
+            <p className="mt-1 text-xs text-ink-faint">{item.startsAt ? new Date(item.startsAt).toLocaleString() : "—"}</p>
+            {tickets.length > 0 && (
+              <div className="mt-3 border-t border-line pt-3">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
+                  <span>{sold} sold</span>
+                  <span>{sold}/{capacity} ({capacity > 0 ? Math.round((sold / capacity) * 100) : 0}%)</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-surface-alt">
+                  <div className="h-2 rounded-full bg-navy-950" style={{ width: `${capacity > 0 ? Math.round((sold / capacity) * 100) : 0}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-ink-faint">
+                  {tickets.length} ticket type{tickets.length === 1 ? "" : "s"}
+                  {minPrice !== null && ` · from ${formatPrice(minPrice, tickets[0].currency)}`}
+                </p>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

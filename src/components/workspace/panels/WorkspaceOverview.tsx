@@ -1,15 +1,19 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ROLES } from "@/lib/roles";
 import { workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
+import { formatPrice } from "@/lib/format";
 import { Card, DemoBadge, StatCard } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
+import { useDashboardData } from "../useDashboardData";
 
 interface OverviewContent {
   tagline: string;
+  /** Fallback KPIs shown only when the live data can't be loaded. */
   kpis: { label: string; value: string; hint?: string }[];
   actions: { slug: string; title: string; body: string }[];
   /** Business roles: the role-specific last step of the onboarding checklist. */
@@ -98,11 +102,65 @@ const OVERVIEW: Record<WorkspaceRole, OverviewContent> = {
   },
 };
 
+/** Human label for an audit action + resource pair. */
+function auditLine(action: string, resourceType: string) {
+  const resource = resourceType.replace(/-/g, " ") || "record";
+  if (action === "created") return `New ${resource} published`;
+  if (action === "updated") return `${resource.charAt(0).toUpperCase() + resource.slice(1)} updated`;
+  if (action === "accepted") return "Invitation accepted";
+  return `${action.charAt(0).toUpperCase() + action.slice(1)} · ${resource}`;
+}
+
 export function WorkspaceOverview() {
-  const { role, user, profile, profileError } = useWorkspace();
+  const { role, token, user, profile, profileError, reloadProfile } = useWorkspace();
   const config = ROLES[role];
   const content = OVERVIEW[role];
   const firstName = user?.name?.split(" ")[0];
+
+  // Live data for the signed-in business. Staff has no business profile and
+  // keeps the sample KPIs until platform-wide stats exist on the API.
+  const data = useDashboardData(token, profile?.id ?? null);
+
+  // KPIs computed from the live API; falls back to the sample KPIs when the
+  // account has no business profile yet.
+  const kpis = useMemo(() => {
+    if (!profile) return content.kpis;
+
+    // Per-ticket sold/capacity comes from each listing's ticket rows.
+    const ticketRows = Object.values(data.details).flatMap((detail) => detail.tickets ?? []);
+    const sold = ticketRows.reduce((sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0), 0);
+    const capacity = ticketRows.reduce((sum, t) => sum + (t.capacity ?? 0), 0);
+    const gross = ticketRows.reduce(
+      (sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0) * (t.price ?? 0),
+      0,
+    );
+    const currency = ticketRows[0]?.currency ?? "MWK";
+    const succeeded = data.payments.filter((p) => p.status === "succeeded");
+    const feesTotal = succeeded.reduce((sum, p) => sum + (typeof p.amount === "number" ? p.amount : 0), 0);
+    const pendingInvites = data.invitations.filter((i) => i.status === "pending").length;
+
+    return [
+      {
+        label: "Tickets sold",
+        value: sold.toLocaleString(),
+        hint: capacity > 0 ? `${Math.round((sold / capacity) * 100)}% of ${capacity.toLocaleString()} capacity` : "No ticket capacity yet",
+      },
+      {
+        label: "Gross presales",
+        value: gross > 0 ? formatPrice(gross, currency) : "—",
+        hint: `${data.events.length} listing${data.events.length === 1 ? "" : "s"} published`,
+      },
+      {
+        label: "Publishing fees paid",
+        value: feesTotal > 0 ? formatPrice(feesTotal, currency) : "—",
+        hint: `${succeeded.length} successful payment${succeeded.length === 1 ? "" : "s"}`},
+      {
+        label: "Team invites",
+        value: `${pendingInvites} pending`,
+        hint: data.invitations.length > 0 ? `${data.invitations.length} sent in total` : "No invitations yet",
+      },
+    ];
+  }, [profile, content.kpis, data.details, data.events, data.payments, data.invitations]);
 
   const steps = config.business
     ? [
@@ -116,16 +174,16 @@ export function WorkspaceOverview() {
           title: "Get verified",
           body: "Our KYC team reviews your documents and approves, rejects or asks for more information.",
           slug: "profile",
-          done: false,
-          waiting: Boolean(profile),
+          done: profile?.isVerified === true,
+          waiting: Boolean(profile) && profile?.isVerified !== true,
         },
         {
           title: "Invite your team",
           body: "Every staff member gets an individually attributable account — no shared logins.",
           slug: "team",
-          done: false,
+          done: data.invitations.length > 0 || data.audit.some((entry) => entry.resourceType === "invitation"),
         },
-        ...(content.finalStep ? [{ ...content.finalStep, done: false }] : []),
+        ...(content.finalStep ? [{ ...content.finalStep, done: data.events.length > 0 }] : []),
       ]
     : [];
 
@@ -154,7 +212,10 @@ export function WorkspaceOverview() {
 
       {config.business && (
         <Card>
-          <h2 className="text-lg font-bold text-navy-950">Get set up</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-navy-950">Get set up</h2>
+            {!profile && <DemoBadge />}
+          </div>
           <ol className="mt-4 flex flex-col divide-y divide-line">
             {steps.map((step, index) => (
               <li key={step.title} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
@@ -185,15 +246,37 @@ export function WorkspaceOverview() {
       )}
 
       <section>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-navy-950">At a glance</h2>
-          <DemoBadge />
+          <div className="flex items-center gap-3">
+            {config.business && profile && (
+              <>
+                {data.loading && <span className="text-xs text-ink-faint">Refreshing…</span>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    data.reload();
+                    void reloadProfile();
+                  }}
+                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-navy-950 transition-colors hover:bg-surface-alt"
+                >
+                  Refresh
+                </button>
+              </>
+            )}
+            {(!config.business || !profile) && <DemoBadge />}
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {content.kpis.map((kpi) => (
+          {kpis.map((kpi) => (
             <StatCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
           ))}
         </div>
+        {config.business && profile && Object.keys(data.errors).length > 0 && (
+          <p role="alert" className="mt-3 rounded-lg bg-error-surface px-3 py-2 text-sm text-error">
+            Some live data couldn&apos;t load ({Object.values(data.errors).join("; ")}).
+          </p>
+        )}
       </section>
 
       <section>
@@ -212,6 +295,29 @@ export function WorkspaceOverview() {
           ))}
         </div>
       </section>
+
+      {config.business && profile && data.audit.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-navy-950">Recent activity</h2>
+            <Link href={workspaceHref(role, "audit")} className="text-sm font-semibold text-navy-950 hover:text-gold-600">
+              Full audit log →
+            </Link>
+          </div>
+          <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-surface">
+            {data.audit.slice(-5).reverse().map((entry) => (
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <p className="text-sm font-medium text-navy-950">
+                  {auditLine(String(entry.action ?? ""), String(entry.resourceType ?? ""))}
+                </p>
+                <p className="text-xs text-ink-faint">
+                  {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
