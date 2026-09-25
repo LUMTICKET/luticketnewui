@@ -12,12 +12,14 @@ import {
   getCurrentUser,
   googleAuth,
   saveAuthSession,
+  saveAuthUser,
   type AuthSession,
   type AuthUser,
 } from "@/lib/auth";
 import {
   PUBLIC_ROLES,
   ROLES,
+  businessTypeFromServer,
   getLastRole,
   resolveRole,
   roleLanding,
@@ -27,8 +29,9 @@ import {
   staffAccess,
   type AccountRole,
 } from "@/lib/roles";
+import { fetchBusinessTypes, workspaceForBusinessType, type BusinessType } from "@/lib/business-types";
 import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
-import { RoleIcon, RoleSelector } from "@/components/auth/RoleSelector";
+import { RoleIcon, RoleSelector, BusinessTypeSelector } from "@/components/auth/RoleSelector";
 
 type AuthMode = "login" | "signup";
 
@@ -55,6 +58,11 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [remember, setRemember] = useState(true);
 
+  // Business types come from the API database (GET /api/business-types). The
+  // selection is sent as `businessType` on signup and Google first sign-in.
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([]);
+  const [businessType, setBusinessType] = useState<string | null>(null);
+
   useEffect(() => {
     if (initialRole || isStaffPortal || isSignup) return;
     const last = getLastRole();
@@ -62,6 +70,26 @@ export function AuthForm({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (last) setRole(last);
   }, [initialRole, isStaffPortal, isSignup]);
+
+  useEffect(() => {
+    if (!isSignup) return;
+    let cancelled = false;
+    fetchBusinessTypes()
+      .then((types) => {
+        if (cancelled) return;
+        setBusinessTypes(types);
+        // Preselect when the page was opened with a specific business role.
+        if (role === "bus-operator") setBusinessType("bus-operator");
+        else if (role === "organizer") setBusinessType("event-organizer");
+      })
+      .catch(() => {
+        if (!cancelled) setError("Could not load business types. Check your connection and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignup]);
 
   const finish = useCallback(
     async (session: AuthSession, keep: boolean, chosen: AccountRole) => {
@@ -79,7 +107,10 @@ export function AuthForm({
         throw new Error("This account isn't provisioned for staff access. Ask an administrator to enable it.");
       }
 
+      // Route by the business type recorded on the account (user.businessType);
+      // the form choice is only a fallback for accounts without one.
       const finalRole = resolveRole(chosen, user);
+      if (user) saveAuthUser(user, keep);
       saveRole(finalRole, keep);
       router.push(safeNext(next) ?? roleLanding(finalRole));
       router.refresh();
@@ -96,11 +127,14 @@ export function AuthForm({
         const profile = decodeJwtPayload(idToken);
         if (!profile.email) throw new Error("No email found in Google account.");
 
+        // First-time Google sign-in must select a business type (required by the
+        // API); returning users keep their stored type, so none is sent.
         const session = await googleAuth(
           idToken,
           profile.email,
           profile.name || profile.given_name || "",
           profile.picture || "",
+          businessType ?? undefined,
         );
         await finish(session, true, role);
       } catch (requestError) {
@@ -109,7 +143,7 @@ export function AuthForm({
         setBusy(false);
       }
     },
-    [finish, role],
+    [finish, role, businessType],
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -119,12 +153,19 @@ export function AuthForm({
 
     try {
       const formData = new FormData(event.currentTarget);
+
+      if (isSignup && !businessType) {
+        throw new Error("Choose your business type to continue.");
+      }
+
       const session = await authRequest<AuthSession>(isSignup ? "/api/auth/signup" : "/api/auth/login", {
         email: formData.get("email"),
         password: formData.get("password"),
         ...(isSignup && {
           name: formData.get("name"),
           country: formData.get("country"),
+          // Required by the API — stored on the user as business_type_id.
+          businessType: businessType,
         }),
       });
 
@@ -139,7 +180,10 @@ export function AuthForm({
     }
   }
 
+  // On login the form's role choice is only a navigation hint; the workspace is
+  // resolved from the account's stored businessType after sign-in (see finish()).
   const config = ROLES[role];
+  const selectedType = businessTypes.find((t) => t.slug === businessType) ?? null;
 
   return (
     <>
@@ -171,6 +215,26 @@ export function AuthForm({
                 : "Your account is free — you can also buy tickets as a guest without one."
               : `You'll land in: ${config.workspace}.`}
           </p>
+
+          {isSignup && !isStaffPortal && (
+            <div className="mt-4">
+              <BusinessTypeSelector
+                types={businessTypes}
+                value={businessType}
+                onChange={(slug) => {
+                  setBusinessType(slug);
+                  const workspace = workspaceForBusinessType({ slug });
+                  if (workspace) setRole(workspace);
+                }}
+                label={businessTypes.length > 0 ? "Business type" : "Loading business types…"}
+              />
+              <p className="mt-2.5 text-xs text-ink-muted">
+                {selectedType
+                  ? `Saved to your account as “${selectedType.name}” — your dashboard follows this business.`
+                  : "Pick the business you run; it's stored on your account and drives your workspace."}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

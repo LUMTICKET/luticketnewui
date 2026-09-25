@@ -1,4 +1,5 @@
 import { clearStoredRole } from "@/lib/roles";
+import type { BusinessType } from "@/lib/business-types";
 
 export interface AuthSession {
   token: string;
@@ -13,6 +14,8 @@ export interface AuthUser {
   email: string;
   name?: string;
   country?: string;
+  /** Linked business type from the API's business_types table (signup / Google first sign-in). */
+  businessType?: BusinessType | null;
   [key: string]: unknown;
 }
 
@@ -31,6 +34,7 @@ export interface BusinessProfile {
 }
 
 const SESSION_KEY = "lumiticket.auth";
+const USER_KEY = "lumiticket.user";
 
 export function getApiBaseUrl() {
   return (process.env.NEXT_PUBLIC_API_URL || "https://api-gamma-mocha-qn31xem8po.vercel.app").replace(/\/$/, "");
@@ -53,7 +57,30 @@ export function clearAuthSession() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SESSION_KEY);
   window.sessionStorage.removeItem(SESSION_KEY);
+  window.localStorage.removeItem(USER_KEY);
+  window.sessionStorage.removeItem(USER_KEY);
   clearStoredRole();
+}
+
+/**
+ * Caches the authenticated user (including their linked businessType) beside the
+ * session so the workspace shell and header can route from the account of record
+ * without waiting on another /api/auth/me round-trip.
+ */
+export function saveAuthUser(user: AuthUser, remember = true) {
+  if (typeof window === "undefined") return;
+  (remember ? window.localStorage : window.sessionStorage).setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function getAuthUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(USER_KEY) ?? window.sessionStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
 }
 
 /** Thrown for any non-2xx API response; `status` lets callers tell an expired session (401) from other failures. */
@@ -293,10 +320,37 @@ export async function logoutSession(token: string) {
   }
 }
 
-export async function authRequest<T>(path: string, body: Record<string, unknown>) {
+export function googleAuth(
+  idToken: string,
+  email: string,
+  name: string,
+  avatar: string,
+  businessType?: string,
+) {
+  return authRequest<AuthSession>("/api/auth/google", {
+    idToken,
+    email,
+    name,
+    avatar,
+    ...(businessType ? { businessType } : {}),
+  });
+}
+
+/**
+ * Auth POST/PATCH helper. A bearer token is only sent when supplied — signup and
+ * login are anonymous, while the business-type PATCH endpoint is protected.
+ */
+export async function authRequest<T>(
+  path: string,
+  body: Record<string, unknown>,
+  options: { method?: "POST" | "PATCH"; token?: string } = {},
+) {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: options.method ?? "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 
@@ -330,18 +384,17 @@ export function decodeJwtPayload(token: string) {
   };
 }
 
-export function googleAuth(idToken: string, email: string, name: string, avatar: string) {
-  return authRequest<AuthSession>("/api/auth/google", {
-    idToken,
-    email,
-    name,
-    avatar,
-  });
-}
-
 export function saveAuthSession(session: AuthSession, remember = true) {
   const storage = remember ? window.localStorage : window.sessionStorage;
   storage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+/** Updates the signed-in user's recorded business type (id, slug, or name). */
+export function updateBusinessType(token: string, businessType: string | number) {
+  return authRequest<{ user: AuthUser }>("/api/auth/signup", { businessType }, {
+    method: "PATCH",
+    token,
+  });
 }
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}) {

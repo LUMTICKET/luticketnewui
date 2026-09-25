@@ -1,6 +1,7 @@
 "use client";
 
 import { ROLES, type AccountRole } from "@/lib/roles";
+import type { BusinessType } from "@/lib/business-types";
 
 export function RoleIcon({ role, size = 20 }: { role: AccountRole; size?: number }) {
   const common = {
@@ -114,6 +115,75 @@ export function RoleSelector({
                 <span className="text-sm font-semibold text-navy-950">{config.label}</span>
               </span>
               <span className="text-xs leading-snug text-ink-muted">{config.blurb}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Icon for a business type straight from the API's business_types table. */
+function BusinessTypeIcon({ slug }: { slug: string }) {
+  if (slug === "bus-operator") return <RoleIcon role="bus-operator" size={17} />;
+  if (slug === "flight-operator") return <RoleIcon role="courier" size={17} />;
+  if (slug === "tour-operator") return <RoleIcon role="agent" size={17} />;
+  return <RoleIcon role="organizer" size={17} />;
+}
+
+/**
+ * Business types as stored in the API database — the same options the signup
+ * endpoint validates `businessType` against.
+ */
+export function BusinessTypeSelector({
+  types,
+  value,
+  onChange,
+  label,
+}: {
+  types: BusinessType[];
+  value: string | null;
+  onChange: (slug: string) => void;
+  label: string;
+}) {
+  return (
+    <div>
+      <p id="business-type-selector-label" className="text-sm font-medium text-ink">
+        {label}
+      </p>
+      <div
+        role="radiogroup"
+        aria-labelledby="business-type-selector-label"
+        className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+      >
+        {types.map((type) => {
+          const selected = value === type.slug;
+          return (
+            <button
+              key={type.slug}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(type.slug)}
+              className={`flex items-start gap-2.5 rounded-2xl border p-3 text-left transition-colors ${
+                selected
+                  ? "border-navy-950 bg-navy-50 ring-1 ring-navy-950"
+                  : "border-line bg-surface hover:border-navy-300"
+              }`}
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  selected ? "bg-navy-950 text-white" : "bg-surface-alt text-navy-950"
+                }`}
+              >
+                <BusinessTypeIcon slug={type.slug} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-navy-950">{type.name}</span>
+                {type.description && (
+                  <span className="mt-0.5 block text-xs leading-snug text-ink-muted">{type.description}</span>
+                )}
+              </span>
             </button>
           );
         })}

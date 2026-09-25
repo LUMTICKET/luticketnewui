@@ -156,6 +156,7 @@ export function clearSignupDraft() {
 // ---------------------------------------------------------------------------
 // Server-provided roles (used when the API starts returning them)
 // ---------------------------------------------------------------------------
+import { workspaceForBusinessType } from "@/lib/business-types";
 type MaybeUser = { email?: unknown; role?: unknown; roles?: unknown; accountType?: unknown } | null | undefined;
 
 const SERVER_ROLE_ALIASES: Record<string, AccountRole> = {
@@ -195,7 +196,22 @@ export function roleFromServer(user: MaybeUser): AccountRole | null {
  */
 export function resolveRole(selected: AccountRole, user: MaybeUser): AccountRole {
   const server = roleFromServer(user);
-  return server && server !== "customer" ? server : selected;
+  if (server && server !== "customer") return server;
+
+  // The API records the selected business type on the user (business_type_id) and
+  // returns it as `user.businessType` — that's the account type of record.
+  const workspace = workspaceForBusinessType(businessTypeFromServer(user));
+  return workspace ?? selected;
+}
+
+/** The businessType object (or bare slug) the API returns on the user record, if any. */
+export function businessTypeFromServer(user: MaybeUser) {
+  const value = (user as { businessType?: unknown } | null | undefined)?.businessType;
+  if (typeof value === "string" && value) return { slug: value };
+  if (value && typeof value === "object" && typeof (value as { slug?: unknown }).slug === "string") {
+    return value as { slug: string };
+  }
+  return null;
 }
 
 export type StaffAccess = "granted" | "preview" | "denied";
