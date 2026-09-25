@@ -179,8 +179,32 @@ export async function listEvents(token: string, businessProfileId: number | stri
   return result ?? [];
 }
 
+export interface EventTicketTypeRow {
+  id: number | string;
+  name: string;
+  price: number;
+  currency: string;
+  capacity: number;
+  remaining: number;
+}
+
+export interface EventDetail extends EventSummary {
+  status?: string;
+  tickets?: EventTicketTypeRow[];
+}
+
+/** Full event with its ticket types — the list endpoint omits the tickets. */
+export function getEvent(token: string, id: number | string) {
+  return authorizedRequest<EventDetail>(`/api/events/${id}`, token);
+}
+
 export interface PaymentRecord {
   id: number | string;
+  method?: string;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  paidAt?: string;
   [key: string]: unknown;
 }
 
@@ -197,6 +221,14 @@ export function simulatePayment(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listPayments(token: string, businessProfileId: number | string) {
+  const result = await authorizedRequest<PaymentRecord[]>(
+    `/api/payments/simulate?businessProfileId=${businessProfileId}`,
+    token,
+  );
+  return result ?? [];
 }
 
 export interface TicketTierInput {
