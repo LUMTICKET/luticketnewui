@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { countries } from "@/lib/data";
 import { createBusinessProfile } from "@/lib/auth";
+import { updateBusinessProfile } from "@/lib/operations";
 import { ROLES, clearSignupDraft, getSignupDraft } from "@/lib/roles";
 import { Card, PageHeader, inputClass } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
@@ -14,8 +15,38 @@ export function BusinessProfilePanel() {
   const config = ROLES[role];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Sign-up captured the business name; use it as the starting point.
   const [draftName] = useState(() => getSignupDraft()?.businessName ?? "");
+
+  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile) return;
+    const form = event.currentTarget;
+    setError("");
+    setBusy(true);
+
+    try {
+      const data = new FormData(form);
+      await updateBusinessProfile(token, profile.id, {
+        businessName: String(data.get("businessName") || ""),
+        email: String(data.get("email") || ""),
+        phone: String(data.get("phone") || ""),
+        address: String(data.get("address") || ""),
+        city: String(data.get("city") || ""),
+        country: String(data.get("country") || ""),
+        type: String(data.get("type") || "company"),
+        website: String(data.get("website") || ""),
+        description: String(data.get("description") || ""),
+      });
+      setEditing(false);
+      await reloadProfile();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Could not update your business profile.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,7 +162,14 @@ export function BusinessProfilePanel() {
         <Card className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-navy-950">{profile.businessName}</h2>
-            <Badge tone="success">Profile created</Badge>
+            <div className="flex items-center gap-2">
+              {profile.isVerified === true ? (
+                <Badge tone="success">Verified</Badge>
+              ) : (
+                <Badge tone="warning">In KYC review</Badge>
+              )}
+              <Badge tone="success">Profile created</Badge>
+            </div>
           </div>
           <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
             {(
@@ -151,6 +189,88 @@ export function BusinessProfilePanel() {
             ))}
           </dl>
           {profile.description && <p className="mt-4 text-sm text-ink-muted">{profile.description}</p>}
+
+          {editing ? (
+            <form onSubmit={handleUpdate} className="mt-6 grid grid-cols-1 gap-4 border-t border-line pt-6 sm:grid-cols-2">
+              <div>
+                <label htmlFor="edit-businessName" className="text-sm font-medium text-ink">Business name</label>
+                <input id="edit-businessName" name="businessName" required defaultValue={profile.businessName} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div>
+                <label htmlFor="edit-type" className="text-sm font-medium text-ink">Business type</label>
+                <select id="edit-type" name="type" defaultValue={String(profile.type || "company")} className={`mt-1.5 ${inputClass} h-12`}>
+                  <option value="company">Registered company</option>
+                  <option value="individual">Individual / sole trader</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-email" className="text-sm font-medium text-ink">Business email</label>
+                <input id="edit-email" name="email" type="email" required defaultValue={profile.email} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div>
+                <label htmlFor="edit-phone" className="text-sm font-medium text-ink">Phone</label>
+                <input id="edit-phone" name="phone" required defaultValue={profile.phone} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="edit-address" className="text-sm font-medium text-ink">Address</label>
+                <input id="edit-address" name="address" required defaultValue={profile.address} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div>
+                <label htmlFor="edit-city" className="text-sm font-medium text-ink">City</label>
+                <input id="edit-city" name="city" required defaultValue={profile.city} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div>
+                <label htmlFor="edit-country" className="text-sm font-medium text-ink">Country</label>
+                <select id="edit-country" name="country" required defaultValue={profile.country} className={`mt-1.5 ${inputClass} h-12`}>
+                  {countries.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="edit-website" className="text-sm font-medium text-ink">Website</label>
+                <input id="edit-website" name="website" defaultValue={profile.website || ""} className={`mt-1.5 ${inputClass} h-12`} />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="edit-description" className="text-sm font-medium text-ink">Description</label>
+                <textarea
+                  id="edit-description"
+                  name="description"
+                  rows={3}
+                  defaultValue={profile.description || ""}
+                  className="mt-1.5 w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-navy-400"
+                />
+              </div>
+
+              {error && (
+                <p role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error sm:col-span-2">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex gap-3 sm:col-span-2">
+                <Button type="submit" variant="accent" size="lg" disabled={busy}>
+                  {busy ? "Saving…" : "Save changes"}
+                </Button>
+                <Button type="button" variant="ghost" size="lg" disabled={busy} onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              className="mt-6"
+              onClick={() => {
+                setError("");
+                setEditing(true);
+              }}
+            >
+              Edit business details
+            </Button>
+          )}
         </Card>
       )}
     </div>

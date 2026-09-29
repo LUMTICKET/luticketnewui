@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { EventListing, EventTicketType } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { getAuthSession } from "@/lib/auth";
+import { createBooking, type ApiBooking } from "@/lib/operations";
 import {
   AccountNudge,
   GuestDetailsStep,
@@ -21,6 +22,9 @@ export function TicketSelector({ event }: { event: EventListing }) {
   );
   const [step, setStep] = useState<Step>("select");
   const [guest, setGuest] = useState<GuestDetails | null>(null);
+  const [booking, setBooking] = useState<ApiBooking | null>(null);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingBusy, setBookingBusy] = useState(false);
   const loggedIn = Boolean(getAuthSession());
 
   const soldOut = event.status === "sold-out" || ticketTypes.every((t) => t.remaining === 0);
@@ -40,9 +44,32 @@ export function TicketSelector({ event }: { event: EventListing }) {
     Array.from(event.id + totalQty).reduce((a, c) => a + c.charCodeAt(0), 11),
   )}`;
 
+  async function confirmBooking() {
+    if (!getAuthSession()) return;
+    setBookingBusy(true);
+    setBookingError("");
+    try {
+      const created = await createBooking({
+        kind: "event",
+        title: event.title,
+        detail: selection.map((t) => `${quantities[t.name]}× ${t.name}`).join(", "),
+        scheduledFor: event.date ? new Date(event.date).toISOString() : undefined,
+        amount: total,
+        currency: event.currency,
+      });
+      setBooking(created);
+      setStep("confirmed");
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : "The booking could not be saved.");
+      setStep("select");
+    } finally {
+      setBookingBusy(false);
+    }
+  }
+
   function handleConfirmClick() {
     if (loggedIn) {
-      setStep("confirmed");
+      void confirmBooking();
     } else {
       setStep("details");
     }
@@ -75,7 +102,7 @@ export function TicketSelector({ event }: { event: EventListing }) {
           </span>
         </div>
 
-        <p className="mt-4 text-sm text-ink-muted">Reference: {reference}</p>
+        <p className="mt-4 text-sm text-ink-muted">Reference: {booking?.reference ?? reference}</p>
         <p className="mt-1 text-xs text-ink-faint">
           {guest ? `Sent to ${guest.name} at ${guest.contact}. ` : ""}
           Available offline at the gate.
@@ -136,11 +163,16 @@ export function TicketSelector({ event }: { event: EventListing }) {
           variant="accent"
           size="lg"
           className="mt-6 w-full"
-          disabled={totalQty === 0}
+          disabled={totalQty === 0 || bookingBusy}
           onClick={handleConfirmClick}
         >
-          Confirm &amp; pay
+          {bookingBusy ? "Confirming…" : "Confirm & pay"}
         </Button>
+        {bookingError && (
+          <p role="alert" className="mt-3 rounded-lg bg-error-surface px-3 py-2 text-sm text-error">
+            {bookingError}
+          </p>
+        )}
       </div>
     </div>
   );

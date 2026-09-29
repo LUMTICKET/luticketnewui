@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { ApiError, clearAuthSession, getAuthSession } from "@/lib/auth";
+import { listBookings, type ApiBooking } from "@/lib/operations";
 import { sampleBookings } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
 import type { CustomerBooking } from "@/lib/types";
@@ -23,15 +25,68 @@ const statusTone = {
   cancelled: "error",
 } as const;
 
-function isPast(status: CustomerBooking["status"]) {
+function isPast(status: string) {
   return status === "completed" || status === "delivered" || status === "cancelled";
+}
+
+/** Maps an API booking row to the display shape used by both live and sample lists. */
+interface DisplayBooking {
+  id: string;
+  kind: keyof typeof kindLabel;
+  title: string;
+  detail: string;
+  reference: string;
+  date: string;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
+function fromApi(booking: ApiBooking): DisplayBooking {
+  return {
+    id: String(booking.id),
+    kind: (booking.kind in kindLabel ? booking.kind : "bus") as keyof typeof kindLabel,
+    title: booking.title,
+    detail: booking.detail || "",
+    reference: booking.reference,
+    date: booking.scheduledFor ? new Date(booking.scheduledFor).toISOString().slice(0, 10) : "",
+    amount: booking.amount,
+    currency: booking.currency,
+    status: booking.status,
+  };
 }
 
 export default function BookingsPage() {
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [live, setLive] = useState<DisplayBooking[] | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  const results = sampleBookings.filter((b) => {
+  const hasSession = Boolean(getAuthSession());
+
+  useEffect(() => {
+    if (!hasSession) return;
+    let cancelled = false;
+    listBookings()
+      .then((bookings) => {
+        if (!cancelled) setLive(bookings.map(fromApi));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        if (error instanceof ApiError && error.status === 401) {
+          clearAuthSession();
+          setSessionExpired(true);
+        }
+        setLive([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSession]);
+
+  const bookings: DisplayBooking[] = live ?? sampleBookings.map((b: CustomerBooking) => ({ ...b }));
+
+  const results = bookings.filter((b) => {
     if (filter === "upcoming") return !isPast(b.status);
     if (filter === "past") return isPast(b.status);
     return true;
@@ -44,13 +99,25 @@ export default function BookingsPage() {
         Bus tickets, event tickets, and parcels — all in one place.
       </p>
 
-      <div className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-        Showing example bookings for preview.{" "}
-        <Link href="/login" className="font-semibold text-navy-950 hover:text-gold-600">
-          Log in
-        </Link>{" "}
-        to see your real trips and tickets.
-      </div>
+      {sessionExpired && (
+        <div className="mt-4 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
+          Your session expired —{" "}
+          <Link href="/login?next=%2Fbookings" className="font-semibold underline">
+            log in
+          </Link>{" "}
+          again to see your live bookings.
+        </div>
+      )}
+
+      {!hasSession && (
+        <div className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">
+          Showing example bookings for preview.{" "}
+          <Link href="/login" className="font-semibold text-navy-950 hover:text-gold-600">
+            Log in
+          </Link>{" "}
+          to see your real trips and tickets.
+        </div>
+      )}
 
       <div role="tablist" aria-label="Filter bookings" className="mt-6 flex gap-1">
         {filters.map((f) => (
@@ -82,7 +149,7 @@ export default function BookingsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Badge tone="neutral">{kindLabel[booking.kind]}</Badge>
-                  <Badge tone={statusTone[booking.status]}>
+                  <Badge tone={statusTone[booking.status as keyof typeof statusTone] ?? "neutral"}>
                     {booking.status.replace("-", " ")}
                   </Badge>
                 </div>

@@ -1,3 +1,4 @@
+import { listCatalogEvents, type CatalogEvent } from "@/lib/operations";
 import { countries, trendingEvents } from "@/lib/data";
 import { formatEventDate, formatPrice } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
@@ -15,13 +16,50 @@ const statusTone = {
   "sold-out": "error",
 } as const;
 
+interface DisplayEvent {
+  id: string;
+  title: string;
+  category: string;
+  venue: string;
+  city: string;
+  countryCode: string;
+  date: string;
+  fromPrice: number;
+  currency: string;
+  status: "on-sale" | "selling-fast" | "sold-out";
+}
+
+function fromApi(event: CatalogEvent): DisplayEvent {
+  return {
+    id: String(event.id),
+    title: event.title,
+    category: event.category,
+    venue: event.venue || event.location || "",
+    city: event.city || "",
+    countryCode: event.countryCode || "",
+    date: event.startsAt,
+    fromPrice: event.fromPrice,
+    currency: event.currency,
+    status: event.status,
+  };
+}
+
 export default async function EventsPage(props: PageProps<"/events">) {
   const params = await props.searchParams;
   const q = typeof params.q === "string" ? params.q.toLowerCase() : "";
   const country = typeof params.country === "string" ? params.country : "";
   const countryName = countries.find((c) => c.code === country)?.name;
 
-  const results = trendingEvents.filter(
+  // Live catalog first; the sample listings are the fallback while the API is
+  // empty or unreachable so the page never blanks.
+  let live: CatalogEvent[] = [];
+  try {
+    live = await listCatalogEvents({ country: country || undefined, q: q || undefined });
+  } catch {
+    live = [];
+  }
+
+  const liveResults = live.map(fromApi).filter(
     (e) =>
       (!q ||
         e.title.toLowerCase().includes(q) ||
@@ -29,6 +67,20 @@ export default async function EventsPage(props: PageProps<"/events">) {
         e.category.toLowerCase().includes(q)) &&
       (!country || e.countryCode === country),
   );
+
+  const sampleResults = trendingEvents
+    .map((e) => ({ ...e, id: String(e.id) }))
+    .filter(
+      (e) =>
+        (!q ||
+          e.title.toLowerCase().includes(q) ||
+          e.city.toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q)) &&
+        (!country || e.countryCode === country),
+    );
+
+  const seen = new Set(liveResults.map((e) => e.title.toLowerCase()));
+  const results = [...liveResults, ...sampleResults.filter((e) => !seen.has(e.title.toLowerCase()))];
 
   return (
     <div>
@@ -69,7 +121,8 @@ export default async function EventsPage(props: PageProps<"/events">) {
                   {event.title}
                 </h3>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {event.venue}, {event.city}
+                  {event.venue}
+                  {event.city ? `, ${event.city}` : ""}
                 </p>
                 <p className="mt-1 text-sm text-ink-muted">
                   {formatEventDate(event.date)}
@@ -81,6 +134,12 @@ export default async function EventsPage(props: PageProps<"/events">) {
             </Link>
           ))}
         </div>
+
+        {results.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-line p-10 text-center text-ink-muted">
+            No events match that search yet. Try a different term or country.
+          </div>
+        )}
       </div>
     </div>
   );
