@@ -16,6 +16,7 @@ import {
 import { ROLES, businessTypeFromServer, getStoredRole, roleLanding, saveRole, type AccountRole } from "@/lib/roles";
 import { workspaceForBusinessType } from "@/lib/business-types";
 import { sampleBookings } from "@/lib/data";
+import { listBookings, type ApiBooking } from "@/lib/operations";
 import { formatPrice } from "@/lib/format";
 
 const quickActions = [
@@ -33,6 +34,16 @@ const statusTone = {
   cancelled: "error",
 } as const;
 
+interface RecentBooking {
+  id: string;
+  title: string;
+  detail: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
 /** Display name for the stored business type; falls back to prettified slug. */
 function typeDisplayName(slug: string, user: AuthUser | null) {
   const stored = user?.businessType as { name?: string } | null | undefined;
@@ -45,6 +56,7 @@ export function AccountHome() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [homeRole, setHomeRole] = useState<AccountRole>("customer");
   const [signingOut, setSigningOut] = useState(false);
+  const [recent, setRecent] = useState<RecentBooking[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +94,26 @@ export function AccountHome() {
           saveRole(serverWorkspace, true);
           setHomeRole(serverWorkspace);
         }
+      }
+
+      // Real bookings for the signed-in customer, most recent first.
+      try {
+        const bookings = await listBookings();
+        if (cancelled) return;
+        setRecent(
+          bookings.slice(-3).reverse().map((booking: ApiBooking) => ({
+            id: String(booking.id),
+            title: booking.title,
+            detail: booking.detail || "",
+            reference: booking.reference,
+            amount: booking.amount,
+            currency: booking.currency,
+            status: booking.status,
+          })),
+        );
+      } catch {
+        if (cancelled) return;
+        setRecent(null); // falls back to the sample list below
       }
     })();
 
@@ -157,16 +189,26 @@ export function AccountHome() {
           View all →
         </Link>
       </div>
-      <p className="mt-1 text-xs text-ink-faint">Example bookings shown for preview.</p>
+      {recent === null && <p className="mt-1 text-xs text-ink-faint">Example bookings shown for preview.</p>}
       <ul className="mt-3 flex flex-col gap-3">
-        {sampleBookings.slice(0, 3).map((booking) => (
+        {(recent ?? sampleBookings.slice(0, 3).map((booking) => ({
+          id: booking.id,
+          title: booking.title,
+          detail: booking.detail,
+          reference: booking.reference,
+          amount: booking.amount,
+          currency: booking.currency,
+          status: booking.status,
+        }))).map((booking) => (
           <li key={booking.id} className="flex flex-col justify-between gap-2 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center">
             <div>
               <p className="font-semibold text-navy-950">{booking.title}</p>
               <p className="text-sm text-ink-muted">{booking.detail} · {booking.reference}</p>
             </div>
             <div className="flex items-center gap-3">
-              <Badge tone={statusTone[booking.status]}>{booking.status.replace("-", " ")}</Badge>
+              <Badge tone={statusTone[booking.status as keyof typeof statusTone] ?? "neutral"}>
+                {booking.status.replace("-", " ")}
+              </Badge>
               <span className="text-sm font-semibold text-navy-950">{formatPrice(booking.amount, booking.currency)}</span>
             </div>
           </li>

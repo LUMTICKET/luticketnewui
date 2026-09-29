@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { BusRoute } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { getAuthSession } from "@/lib/auth";
+import { createBooking, type ApiBooking } from "@/lib/operations";
 import {
   AccountNudge,
   GuestDetailsStep,
@@ -37,6 +38,9 @@ export function SeatSelector({
   const [step, setStep] = useState<Step>("select");
   const [guest, setGuest] = useState<GuestDetails | null>(null);
   const [expiredNotice, setExpiredNotice] = useState(false);
+  const [booking, setBooking] = useState<ApiBooking | null>(null);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingBusy, setBookingBusy] = useState(false);
   const loggedIn = Boolean(getAuthSession());
 
   const seats = useMemo(() => {
@@ -85,9 +89,32 @@ export function SeatSelector({
     Array.from(selected.join("")).reduce((a, c) => a + c.charCodeAt(0), 7),
   )}`;
 
+  async function confirmBooking(contact?: GuestDetails) {
+    if (!getAuthSession()) return; // guarded by handleConfirmClick
+    setBookingBusy(true);
+    setBookingError("");
+    try {
+      const created = await createBooking({
+        kind: "bus",
+        title: `${route.origin} → ${route.destination}`,
+        detail: `${route.operator} · Seats ${selected.join(", ")}${contact ? ` · ${contact.name}` : ""}`,
+        scheduledFor: new Date().toISOString(),
+        amount: total,
+        currency: route.currency,
+      });
+      setBooking(created);
+      setStep("confirmed");
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : "The booking could not be saved.");
+      setStep("select");
+    } finally {
+      setBookingBusy(false);
+    }
+  }
+
   function handleConfirmClick() {
     if (loggedIn) {
-      setStep("confirmed");
+      void confirmBooking();
     } else {
       setStep("details");
     }
@@ -99,6 +126,8 @@ export function SeatSelector({
         onBack={() => setStep("select")}
         onSubmit={(details) => {
           setGuest(details);
+          // Guests don't have a session to own a booking; the API requires auth,
+          // so keep the confirmation local and prompt them to save it.
           setStep("confirmed");
         }}
       />
@@ -122,7 +151,7 @@ export function SeatSelector({
           </span>
         </div>
 
-        <p className="mt-4 text-sm text-ink-muted">Reference: {reference}</p>
+        <p className="mt-4 text-sm text-ink-muted">Reference: {booking?.reference ?? reference}</p>
         <p className="mt-1 text-xs text-ink-faint">
           {guest
             ? `Sent to ${guest.name} at ${guest.contact}. `
@@ -234,11 +263,16 @@ export function SeatSelector({
           variant="accent"
           size="lg"
           className="mt-6 w-full"
-          disabled={!canContinue}
+          disabled={!canContinue || bookingBusy}
           onClick={handleConfirmClick}
         >
-          Confirm &amp; pay
+          {bookingBusy ? "Confirming…" : "Confirm & pay"}
         </Button>
+        {bookingError && (
+          <p role="alert" className="mt-3 rounded-lg bg-error-surface px-3 py-2 text-sm text-error">
+            {bookingError}
+          </p>
+        )}
         {!canContinue && (
           <p className="mt-2 text-center text-xs text-ink-faint">
             Select {passengers - selected.length} more seat

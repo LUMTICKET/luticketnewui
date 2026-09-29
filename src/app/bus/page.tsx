@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { listCatalogRoutes, type CatalogRoute } from "@/lib/operations";
 import { popularRoutes } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
@@ -8,6 +9,32 @@ import { ModuleSearchBar } from "@/components/search/ModuleSearchBar";
 export const metadata = {
   title: "Bus tickets — Lumiticket",
 };
+
+interface DisplayRoute {
+  id: string;
+  origin: string;
+  destination: string;
+  operator: string;
+  duration: string;
+  fromPrice: number;
+  currency: string;
+  departures: number;
+  rating: number;
+}
+
+function fromApi(route: CatalogRoute): DisplayRoute {
+  return {
+    id: String(route.id),
+    origin: route.origin,
+    destination: route.destination,
+    operator: route.operator || "Operator",
+    duration: route.duration ? String(route.duration) : "",
+    fromPrice: route.fromPrice,
+    currency: route.currency,
+    departures: route.departures ?? 1,
+    rating: route.rating ?? 0,
+  };
+}
 
 export default async function BusSearchPage(props: PageProps<"/bus">) {
   const params = await props.searchParams;
@@ -23,12 +50,26 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
     Number(typeof params.passengers === "string" ? params.passengers : 1) || 1,
   );
 
-  const results = popularRoutes.filter(
-    (r) =>
-      (!origin || r.origin.toLowerCase().includes(origin.toLowerCase())) &&
-      (!destination ||
-        r.destination.toLowerCase().includes(destination.toLowerCase())),
+  // Live routes catalog first; the sample routes are the fallback while the
+  // catalog is empty or unreachable so the page never blanks.
+  let live: CatalogRoute[] = [];
+  try {
+    live = await listCatalogRoutes({ origin: origin || undefined, destination: destination || undefined });
+  } catch {
+    live = [];
+  }
+
+  const liveResults = live.map(fromApi);
+  const sampleResults = popularRoutes.map((r) => ({ ...r, id: String(r.id) }));
+
+  const matches = (route: DisplayRoute) =>
+    (!origin || route.origin.toLowerCase().includes(origin.toLowerCase())) &&
+    (!destination || route.destination.toLowerCase().includes(destination.toLowerCase()));
+
+  const seen = new Set(
+    liveResults.map((r) => `${r.origin}|${r.destination}|${r.operator}`.toLowerCase()),
   );
+  const results = [...liveResults, ...sampleResults.filter((r) => matches(r) && !seen.has(`${r.origin}|${r.destination}|${r.operator}`.toLowerCase()))];
 
   return (
     <div>
@@ -96,7 +137,7 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
                 Operator
               </p>
               <div className="mt-2 flex flex-col gap-2 text-sm text-ink">
-                {[...new Set(popularRoutes.map((r) => r.operator))].map(
+                {[...new Set(results.map((r) => r.operator))].map(
                   (op) => (
                     <label key={op} className="flex items-center gap-2">
                       <input
@@ -129,7 +170,9 @@ export default async function BusSearchPage(props: PageProps<"/bus">) {
                     <span>{route.destination}</span>
                   </div>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {route.duration} · {route.departures} departures today
+                    {[route.duration, `${route.departures} departures`]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
 
