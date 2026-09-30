@@ -198,7 +198,12 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
     );
   }
 
-  const groups = WORKSPACE_NAV[role];
+  // Individuals/sole traders can't invite staff (see TeamPanel) — hide the
+  // nav entry rather than showing a page that immediately turns them away.
+  const isIndividual = ROLES[role].business && profile?.type === "individual";
+  const groups = WORKSPACE_NAV[role]
+    .map((group) => ({ ...group, items: group.items.filter((item) => !(isIndividual && item.slug === "team")) }))
+    .filter((group) => group.items.length > 0);
   const items = groups.flatMap((group) => group.items.map((item) => ({ ...item, href: workspaceHref(role, item.slug) })));
   // The most specific matching item wins, so /events/new highlights "Create event" but not "My events".
   const activeHref = items

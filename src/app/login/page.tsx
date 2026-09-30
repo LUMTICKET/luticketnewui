@@ -13,7 +13,10 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const initialRole =
     roleParam && isAccountRole(roleParam) && PUBLIC_ROLES.includes(roleParam) ? roleParam : undefined;
   const next = safeNext(typeof params.next === "string" ? params.next : null);
-  const signupHref = initialRole ? `/signup?role=${initialRole}` : "/signup";
+  const signupParams = new URLSearchParams();
+  if (initialRole) signupParams.set("role", initialRole);
+  if (next) signupParams.set("next", next);
+  const signupHref = signupParams.size > 0 ? `/signup?${signupParams}` : "/signup";
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col justify-center px-4 py-14 sm:px-6">

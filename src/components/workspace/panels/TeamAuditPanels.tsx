@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
@@ -14,11 +15,14 @@ import {
   type TeamInvitation,
   type TeamRole,
 } from "@/lib/auth";
+import { workspaceHref } from "@/lib/workspace-nav";
+import { permissionLabel, STANDARD_TEAM_ROLES, TEAM_PERMISSIONS } from "@/lib/team-roles";
 import { Card, PageHeader, TableShell, THead, cell, inputClass, rowClass } from "../ui";
 import { ProfileGate } from "../shared";
 import { useWorkspace } from "../WorkspaceContext";
 
 export function TeamPanel() {
+  const { role } = useWorkspace();
   return (
     <div>
       <PageHeader
@@ -26,7 +30,25 @@ export function TeamPanel() {
         description="Every staff account is individually attributable — shared logins aren't permitted. Create roles, then invite people into them."
       />
       <div className="mt-8">
-        <ProfileGate feature="Your team">{(profile) => <TeamManager profile={profile} />}</ProfileGate>
+        <ProfileGate feature="Your team">
+          {(profile) =>
+            profile.type === "individual" ? (
+              <Card>
+                <h2 className="text-lg font-bold text-navy-950">Team management is for companies</h2>
+                <p className="mt-2 text-sm text-ink-muted">
+                  Your business profile is registered as an individual/sole trader, so there&apos;s no one else to
+                  invite. Switch your business type to &quot;Registered company&quot; on your{" "}
+                  <Link href={workspaceHref(role, "profile")} className="font-semibold text-navy-950 underline">
+                    business profile
+                  </Link>{" "}
+                  if you need to add staff.
+                </p>
+              </Card>
+            ) : (
+              <TeamManager profile={profile} />
+            )
+          }
+        </ProfileGate>
       </div>
     </div>
   );
@@ -38,6 +60,26 @@ function TeamManager({ profile }: { profile: BusinessProfile }) {
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Standardized role template: picking one fills the name/description and
+  // pre-checks its permissions, so admins choose from Lumticket's list
+  // instead of typing their own. "Custom role" leaves everything editable.
+  const [template, setTemplate] = useState(STANDARD_TEAM_ROLES[0]);
+  const [roleName, setRoleName] = useState(template.name);
+  const [roleDescription, setRoleDescription] = useState(template.description);
+  const [rolePermissions, setRolePermissions] = useState<string[]>(template.permissions);
+
+  function applyTemplate(slug: string) {
+    const next = STANDARD_TEAM_ROLES.find((t) => t.slug === slug) ?? STANDARD_TEAM_ROLES[0];
+    setTemplate(next);
+    setRoleName(next.slug === "custom" ? "" : next.name);
+    setRoleDescription(next.description);
+    setRolePermissions(next.permissions);
+  }
+
+  function togglePermission(key: string) {
+    setRolePermissions((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -61,22 +103,21 @@ function TeamManager({ profile }: { profile: BusinessProfile }) {
 
   async function handleCreateRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
     setError("");
+    if (!roleName.trim()) {
+      setError("Give the role a name.");
+      return;
+    }
     setBusy(true);
     try {
-      const data = new FormData(form);
       const created = await createTeamRole(token, {
         businessProfileId: profile.id,
-        name: String(data.get("name") || ""),
-        description: String(data.get("description") || ""),
-        permissions: String(data.get("permissions") || "read")
-          .split(",")
-          .map((permission) => permission.trim())
-          .filter(Boolean),
+        name: roleName.trim(),
+        description: roleDescription.trim(),
+        permissions: rolePermissions,
       });
       if (created) setRoles((prev) => [...prev, created]);
-      form.reset();
+      applyTemplate(STANDARD_TEAM_ROLES[0].slug);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Could not create role.");
     } finally {
@@ -123,7 +164,7 @@ function TeamManager({ profile }: { profile: BusinessProfile }) {
                 {role.description && <p className="mt-0.5 text-xs text-ink-muted">{role.description}</p>}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {role.permissions.map((p) => (
-                    <Badge key={p} tone="neutral">{p}</Badge>
+                    <Badge key={p} tone="neutral">{permissionLabel(p)}</Badge>
                   ))}
                 </div>
               </li>
@@ -132,17 +173,59 @@ function TeamManager({ profile }: { profile: BusinessProfile }) {
 
           <form onSubmit={handleCreateRole} className="mt-6 flex flex-col gap-3 border-t border-line pt-6">
             <h3 className="text-sm font-semibold text-navy-950">Create role</h3>
+            <p className="text-xs text-ink-muted">
+              Pick from Lumticket&apos;s standard roles — each comes with its own set of permissions already
+              checked. Only &quot;Custom role&quot; lets you start from scratch.
+            </p>
+            <div>
+              <label htmlFor="role-template" className="text-sm font-medium text-ink">Standard role</label>
+              <select
+                id="role-template"
+                value={template.slug}
+                onChange={(e) => applyTemplate(e.target.value)}
+                className={`mt-1.5 ${inputClass}`}
+              >
+                {STANDARD_TEAM_ROLES.map((t) => (
+                  <option key={t.slug} value={t.slug}>{t.name}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label htmlFor="role-name" className="text-sm font-medium text-ink">Role name</label>
-              <input id="role-name" name="name" required className={`mt-1.5 ${inputClass}`} placeholder="Booking Officer" />
+              <input
+                id="role-name"
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                required
+                className={`mt-1.5 ${inputClass}`}
+                placeholder="Booking Officer"
+              />
             </div>
             <div>
               <label htmlFor="role-description" className="text-sm font-medium text-ink">Description</label>
-              <input id="role-description" name="description" className={`mt-1.5 ${inputClass}`} placeholder="Processes bookings and cancellations" />
+              <input
+                id="role-description"
+                value={roleDescription}
+                onChange={(e) => setRoleDescription(e.target.value)}
+                className={`mt-1.5 ${inputClass}`}
+                placeholder="Processes bookings and cancellations"
+              />
             </div>
             <div>
-              <label htmlFor="role-permissions" className="text-sm font-medium text-ink">Permissions</label>
-              <input id="role-permissions" name="permissions" defaultValue="read" className={`mt-1.5 ${inputClass}`} placeholder="read, write, invite" />
+              <span className="text-sm font-medium text-ink">Permissions</span>
+              <div className="mt-1.5 grid grid-cols-1 gap-1.5 rounded-lg border border-line p-3 sm:grid-cols-2">
+                {TEAM_PERMISSIONS.map((permission) => (
+                  <label key={permission.key} className="flex items-start gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={rolePermissions.includes(permission.key)}
+                      onChange={() => togglePermission(permission.key)}
+                      className="mt-0.5 h-4 w-4 accent-navy-950"
+                    />
+                    {permission.label}
+                  </label>
+                ))}
+              </div>
             </div>
             <Button type="submit" variant="primary" size="md" disabled={busy}>Create role</Button>
           </form>

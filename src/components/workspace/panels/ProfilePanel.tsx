@@ -16,8 +16,9 @@ export function BusinessProfilePanel() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
-  // Sign-up captured the business name; use it as the starting point.
+  // Sign-up captured the business name and individual/company choice; use them as the starting point.
   const [draftName] = useState(() => getSignupDraft()?.businessName ?? "");
+  const [draftAccountType] = useState(() => getSignupDraft()?.accountType ?? "company");
 
   async function handleUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,7 +108,7 @@ export function BusinessProfilePanel() {
             </div>
             <div>
               <label htmlFor="type" className="text-sm font-medium text-ink">Business type</label>
-              <select id="type" name="type" defaultValue="company" className={`mt-1.5 ${inputClass} h-12`}>
+              <select id="type" name="type" defaultValue={draftAccountType} className={`mt-1.5 ${inputClass} h-12`}>
                 <option value="company">Registered company</option>
                 <option value="individual">Individual / sole trader</option>
               </select>

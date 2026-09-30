@@ -130,6 +130,13 @@ export function getLastRole(): AccountRole | null {
 export interface SignupDraft {
   role: AccountRole;
   businessName?: string;
+  /**
+   * Individual/sole-trader vs. registered company, asked at sign-up. Pre-fills
+   * the business profile (KYB) "type" field — the API's real, persisted
+   * record of this. Only companies get a Team Management section; see
+   * `WorkspaceShell` and `TeamPanel`.
+   */
+  accountType?: "individual" | "company";
 }
 
 /** Details captured at sign-up that pre-fill the business verification form. */
@@ -197,6 +204,15 @@ export function roleFromServer(user: MaybeUser): AccountRole | null {
 export function resolveRole(selected: AccountRole, user: MaybeUser): AccountRole {
   const server = roleFromServer(user);
   if (server && server !== "customer") return server;
+
+  // A deliberate "Customer", "Courier operator" or "Retail / POS agent"
+  // choice is never overridden by businessType. The API requires *every*
+  // signup to carry a businessType, but courier and agent have no seeded
+  // type of their own (see business-types.ts) and every seeded type maps to
+  // some *other* workspace — so whatever they picked to satisfy that
+  // required field is a placeholder, not a real classification, and must
+  // never bounce them out of the workspace they actually chose.
+  if (selected === "customer" || selected === "courier" || selected === "agent") return selected;
 
   // The API records the selected business type on the user (business_type_id) and
   // returns it as `user.businessType` — that's the account type of record.

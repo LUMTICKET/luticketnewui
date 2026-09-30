@@ -57,6 +57,10 @@ export function AuthForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [remember, setRemember] = useState(true);
+  // Individual vs. company, asked up front for business accounts (only a
+  // company can invite staff — see TeamPanel). Carried to the KYB form via
+  // the signup draft, the same way businessName already is.
+  const [accountType, setAccountType] = useState<"individual" | "company">("company");
 
   // Business types come from the API database (GET /api/business-types). The
   // selection is sent as `businessType` on signup and Google first sign-in.
@@ -76,11 +80,7 @@ export function AuthForm({
     let cancelled = false;
     fetchBusinessTypes()
       .then((types) => {
-        if (cancelled) return;
-        setBusinessTypes(types);
-        // Preselect when the page was opened with a specific business role.
-        if (role === "bus-operator") setBusinessType("bus-operator");
-        else if (role === "organizer") setBusinessType("event-organizer");
+        if (!cancelled) setBusinessTypes(types);
       })
       .catch(() => {
         if (!cancelled) setError("Could not load business types. Check your connection and try again.");
@@ -88,8 +88,26 @@ export function AuthForm({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignup]);
+
+  useEffect(() => {
+    if (!isSignup || businessTypes.length === 0) return;
+    // Business type is a required field on the API's signup call for every
+    // account, but only business roles are actually asked about it (see the
+    // render below) — a plain customer should never have to think about
+    // "Event Organizer" vs "Bus Operator" just to book a ticket. Bus operator
+    // and organizer map onto a real seeded type; courier and retail/POS
+    // agent don't have one yet (see DATABASE-REQUIREMENTS.md), so those two
+    // are left for the person to pick manually from what's available.
+    if (role === "bus-operator") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBusinessType("bus-operator");
+    } else if (role === "organizer") {
+      setBusinessType("event-organizer");
+    } else if (!ROLES[role].business) {
+      setBusinessType((current) => current ?? businessTypes[0]?.slug ?? null);
+    }
+  }, [isSignup, role, businessTypes]);
 
   const finish = useCallback(
     async (session: AuthSession, keep: boolean, chosen: AccountRole) => {
@@ -155,7 +173,9 @@ export function AuthForm({
       const formData = new FormData(event.currentTarget);
 
       if (isSignup && !businessType) {
-        throw new Error("Choose your business type to continue.");
+        throw new Error(
+          config.business ? "Choose your business type to continue." : "Still setting things up — try again in a moment.",
+        );
       }
 
       const session = await authRequest<AuthSession>(isSignup ? "/api/auth/signup" : "/api/auth/login", {
@@ -170,7 +190,11 @@ export function AuthForm({
       });
 
       if (isSignup && ROLES[role].business) {
-        saveSignupDraft({ role, businessName: String(formData.get("businessName") || "").trim() });
+        saveSignupDraft({
+          role,
+          businessName: String(formData.get("businessName") || "").trim(),
+          accountType,
+        });
       }
       await finish(session, isSignup || remember, role);
     } catch (requestError) {
@@ -216,13 +240,19 @@ export function AuthForm({
               : `You'll land in: ${config.workspace}.`}
           </p>
 
-          {isSignup && !isStaffPortal && (
+          {isSignup && !isStaffPortal && config.business && (
             <div className="mt-4">
               <BusinessTypeSelector
                 types={businessTypes}
                 value={businessType}
                 onChange={(slug) => {
                   setBusinessType(slug);
+                  // Courier and retail/POS agent have no seeded business type
+                  // of their own yet (see business-types.ts), so whichever
+                  // type they pick here is just a required-field placeholder
+                  // — it must not silently switch their workspace away from
+                  // the one they deliberately chose above.
+                  if (role === "courier" || role === "agent") return;
                   const workspace = workspaceForBusinessType({ slug });
                   if (workspace) setRole(workspace);
                 }}
@@ -268,6 +298,36 @@ export function AuthForm({
               Business or trading name
             </label>
             <input id="businessName" name="businessName" type="text" required autoComplete="organization" className={inputClasses} placeholder="Nyasa Express Ltd" />
+          </div>
+        )}
+
+        {isSignup && config.business && (
+          <div>
+            <span className="text-sm font-medium text-ink">What type of account are you creating?</span>
+            <div role="radiogroup" aria-label="Account type" className="mt-1.5 grid grid-cols-2 gap-2.5">
+              {(
+                [
+                  { value: "company" as const, label: "Company", hint: "Can invite and manage staff" },
+                  { value: "individual" as const, label: "Individual", hint: "Sole trader, just you" },
+                ]
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={accountType === option.value}
+                  onClick={() => setAccountType(option.value)}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    accountType === option.value
+                      ? "border-navy-950 bg-navy-50 ring-1 ring-navy-950"
+                      : "border-line bg-surface hover:border-navy-300"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-navy-950">{option.label}</span>
+                  <span className="block text-xs leading-snug text-ink-muted">{option.hint}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
