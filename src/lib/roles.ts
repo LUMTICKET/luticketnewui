@@ -96,9 +96,9 @@ export function roleLanding(role: AccountRole | null | undefined) {
 // ---------------------------------------------------------------------------
 // Browser storage
 // ---------------------------------------------------------------------------
-const ROLE_KEY = "lumiticket.role";
-const LAST_ROLE_KEY = "lumiticket.lastRole";
-const DRAFT_KEY = "lumiticket.signupDraft";
+const ROLE_KEY = "lumticket.role";
+const LAST_ROLE_KEY = "lumticket.lastRole";
+const DRAFT_KEY = "lumticket.signupDraft";
 
 export function getStoredRole(): AccountRole | null {
   if (typeof window === "undefined") return null;

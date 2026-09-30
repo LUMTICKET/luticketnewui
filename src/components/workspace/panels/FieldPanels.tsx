@@ -537,7 +537,7 @@ export function PosSellPanel() {
     <div>
       <PageHeader
         title="Sell & register"
-        description="Sell bus and event tickets, or register a parcel, on Lumiticket's behalf. The customer receives a QR ticket or tracking reference."
+        description="Sell bus and event tickets, or register a parcel, on Lumticket's behalf. The customer receives a QR ticket or tracking reference."
       />
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">

@@ -4,16 +4,16 @@ import {
 } from "@/components/business/BusinessRolePage";
 
 export const metadata = {
-  title: "For retail & POS agents — Lumiticket",
+  title: "For retail & POS agents — Lumticket",
   description:
-    "Sell bus tickets, event tickets, and register parcels in person on Lumiticket's behalf, and earn commission per transaction.",
+    "Sell bus tickets, event tickets, and register parcels in person on Lumticket's behalf, and earn commission per transaction.",
 };
 
 const content: BusinessRoleContent = {
   eyebrow: "For retail & POS agents",
   title: "Earn commission selling tickets and parcels in person",
   intro:
-    "Sell bus tickets, event tickets, and register parcels for walk-in customers using a Lumiticket POS device — with a daily float, clear transaction limits, and commission paid on every sale.",
+    "Sell bus tickets, event tickets, and register parcels for walk-in customers using a Lumticket POS device — with a daily float, clear transaction limits, and commission paid on every sale.",
   benefits: [
     {
       title: "One device, three services",

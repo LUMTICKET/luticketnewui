@@ -4,9 +4,9 @@ import {
 } from "@/components/business/BusinessRolePage";
 
 export const metadata = {
-  title: "For bus operators — Lumiticket",
+  title: "For bus operators — Lumticket",
   description:
-    "List your routes on Lumiticket, manage your fleet, and get paid out automatically across the SADC region.",
+    "List your routes on Lumticket, manage your fleet, and get paid out automatically across the SADC region.",
 };
 
 const content: BusinessRoleContent = {
@@ -53,11 +53,11 @@ const content: BusinessRoleContent = {
   requirements: [
     "Transport operator licence & TPIN",
     "Vehicle registration & roadworthiness certificates",
-    "Signed settlement agreement with Lumiticket",
+    "Signed settlement agreement with Lumticket",
     "Fleet and route details, including departure schedules",
     "A bank account or mobile money wallet for payouts",
   ],
-  payout: "Payouts are settled per trip to your linked bank account or mobile money wallet, net of the Lumiticket service fee. You can track every settlement from your operator dashboard.",
+  payout: "Payouts are settled per trip to your linked bank account or mobile money wallet, net of the Lumticket service fee. You can track every settlement from your operator dashboard.",
   faqs: [
     {
       question: "How long does verification take?",
@@ -67,7 +67,7 @@ const content: BusinessRoleContent = {
     {
       question: "Can I still sell tickets at my own counter?",
       answer:
-        "Yes — your counter, retail agents, and the Lumiticket app all draw from the same live seat inventory, so seats never oversell.",
+        "Yes — your counter, retail agents, and the Lumticket app all draw from the same live seat inventory, so seats never oversell.",
     },
     {
       question: "What happens if a trip is cancelled?",
@@ -77,7 +77,7 @@ const content: BusinessRoleContent = {
     {
       question: "Is there a setup fee?",
       answer:
-        "No setup fee — Lumiticket earns a service fee per ticket sold, deducted before payout.",
+        "No setup fee — Lumticket earns a service fee per ticket sold, deducted before payout.",
     },
   ],
 };

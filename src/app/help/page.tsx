@@ -78,14 +78,14 @@ const faqs: FaqItem[] = [
     question: "What payment methods are supported?",
     keywords: ["card", "mobile money", "pos", "pay"],
     answer:
-      "Card, mobile money, and pay-at-agent through a Lumiticket retail/POS location, depending on what's available in your country.",
+      "Card, mobile money, and pay-at-agent through a Lumticket retail/POS location, depending on what's available in your country.",
   },
   {
     category: "Payments",
     question: "Is my payment information safe?",
     keywords: ["security", "card data", "gateway", "safe", "funds"],
     answer:
-      "All payments run through licensed third-party payment gateways. Lumiticket never stores raw card data, and never holds your funds directly.",
+      "All payments run through licensed third-party payment gateways. Lumticket never stores raw card data, and never holds your funds directly.",
   },
   {
     category: "Account & verification",
@@ -119,7 +119,7 @@ const faqs: FaqItem[] = [
   },
   {
     category: "Using the apps",
-    question: "Does Lumiticket work without an internet connection?",
+    question: "Does Lumticket work without an internet connection?",
     keywords: ["offline", "no signal", "sync", "scanning", "driver app"],
     answer:
       "The Scanning & Validation and Driver apps keep accepting ticket and parcel scans offline, queuing them locally and syncing automatically once connectivity returns. Your most recent QR tickets and parcel status stay viewable offline too.",

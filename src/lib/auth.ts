@@ -33,8 +33,8 @@ export interface BusinessProfile {
   [key: string]: unknown;
 }
 
-const SESSION_KEY = "lumiticket.auth";
-const USER_KEY = "lumiticket.user";
+const SESSION_KEY = "lumticket.auth";
+const USER_KEY = "lumticket.user";
 
 export function getApiBaseUrl() {
   return (process.env.NEXT_PUBLIC_API_URL || "https://api-gamma-mocha-qn31xem8po.vercel.app").replace(/\/$/, "");
@@ -444,7 +444,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}) {
     });
     if (refreshResponse.ok) {
       const refreshed = (await refreshResponse.json()) as AuthSession;
-      saveAuthSession(refreshed, Boolean(window.localStorage.getItem("lumiticket.auth")));
+      saveAuthSession(refreshed, Boolean(window.localStorage.getItem("lumticket.auth")));
       headers.set("Authorization", `Bearer ${refreshed.token}`);
       response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers });
     }

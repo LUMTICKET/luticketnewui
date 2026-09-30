@@ -4,9 +4,9 @@ import { countries } from "@/lib/data";
 import { LogoFull } from "@/components/layout/Logo";
 
 export const metadata = {
-  title: "About Lumina Holdings — Lumiticket",
+  title: "About Lumina Holdings — Lumticket",
   description:
-    "Lumiticket is built by Lumina Holdings — a modular, API-first platform for bus ticketing, parcel logistics, and event ticketing across the SADC region.",
+    "Lumticket is built by Lumina Holdings — a modular, API-first platform for bus ticketing, parcel logistics, and event ticketing across the SADC region.",
 };
 
 const modules = [
@@ -31,7 +31,7 @@ const principles = [
   },
   {
     title: "Licensed payments, no held funds",
-    body: "Payments run through licensed gateways and mobile money partners. Lumiticket never holds customer funds directly.",
+    body: "Payments run through licensed gateways and mobile money partners. Lumticket never holds customer funds directly.",
   },
   {
     title: "Built to work offline",
@@ -57,7 +57,7 @@ export default function AboutPage() {
             the SADC region
           </h1>
           <p className="mt-4 max-w-xl text-navy-200">
-            Lumiticket is a modular, API-first platform: each service —
+            Lumticket is a modular, API-first platform: each service —
             buses, parcels, events — operates independently while staying
             fully connected, so new operators, agents, and countries can be
             added without rebuilding the core.

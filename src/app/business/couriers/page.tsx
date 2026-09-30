@@ -4,9 +4,9 @@ import {
 } from "@/components/business/BusinessRolePage";
 
 export const metadata = {
-  title: "For courier operators — Lumiticket",
+  title: "For courier operators — Lumticket",
   description:
-    "Register parcels, assign drivers, and track deliveries end to end with Lumiticket's courier platform.",
+    "Register parcels, assign drivers, and track deliveries end to end with Lumticket's courier platform.",
 };
 
 const content: BusinessRoleContent = {
@@ -29,7 +29,7 @@ const content: BusinessRoleContent = {
     },
     {
       title: "Insurance above threshold",
-      body: "High-value parcels are covered automatically above the threshold you agree with Lumiticket.",
+      body: "High-value parcels are covered automatically above the threshold you agree with Lumticket.",
     },
   ],
   steps: [
@@ -43,7 +43,7 @@ const content: BusinessRoleContent = {
     },
     {
       title: "Accept parcels",
-      body: "Senders book a parcel through Lumiticket; you accept, assign a rider, and start tracking.",
+      body: "Senders book a parcel through Lumticket; you accept, assign a rider, and start tracking.",
     },
     {
       title: "Deliver & get paid",
@@ -54,10 +54,10 @@ const content: BusinessRoleContent = {
     "National ID or courier operating licence",
     "Vehicle and rider registration with declared operating zones",
     "Goods-in-transit insurance above the agreed value threshold",
-    "Signed settlement agreement with Lumiticket",
+    "Signed settlement agreement with Lumticket",
     "A bank account or mobile money wallet for payouts",
   ],
-  payout: "Payouts are settled per completed delivery to your linked bank account or mobile money wallet, net of the Lumiticket service fee, with a statement for every parcel.",
+  payout: "Payouts are settled per completed delivery to your linked bank account or mobile money wallet, net of the Lumticket service fee, with a statement for every parcel.",
   faqs: [
     {
       question: "What counts as an operating zone?",

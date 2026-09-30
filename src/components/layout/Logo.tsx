@@ -50,7 +50,7 @@ export function LogoMark({
   );
 }
 
-/** Product lockup used in headers: Lumina mark + Lumiticket wordmark. */
+/** Product lockup used in headers: Lumina mark + Lumticket wordmark. */
 export function Logo({
   className = "",
   tone = "dark",
@@ -68,7 +68,7 @@ export function Logo({
           tone === "light" ? "text-white" : "text-navy-950"
         }`}
       >
-        Lumi<span className="text-gold-500">ticket</span>
+        Lum<span className="text-gold-500">ticket</span>
       </span>
     </span>
   );

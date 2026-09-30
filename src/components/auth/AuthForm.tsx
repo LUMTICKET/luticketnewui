@@ -206,7 +206,7 @@ export function AuthForm({
             value={role}
             onChange={setRole}
             roles={PUBLIC_ROLES}
-            label={isSignup ? "I want to use Lumiticket as a…" : "Sign in as…"}
+            label={isSignup ? "I want to use Lumticket as a…" : "Sign in as…"}
           />
           <p className="mt-2.5 text-xs text-ink-muted">
             {isSignup

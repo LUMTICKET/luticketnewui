@@ -12,7 +12,7 @@ export function LegalArticle({
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
       <Link href="/" className="text-sm font-semibold text-navy-950 hover:text-gold-600">
-        ← Back to Lumiticket
+        ← Back to Lumticket
       </Link>
       <h1 className="mt-4 text-3xl font-bold text-navy-950">{title}</h1>
       <p className="mt-2 text-sm text-ink-faint">Last updated {updated}</p>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
-  title: "Terms of service — Lumiticket",
+  title: "Terms of service — Lumticket",
 };
 
 export default function TermsPage() {
@@ -10,17 +10,17 @@ export default function TermsPage() {
     <LegalArticle title="Terms of service" updated="12 September 2026">
       <LegalSection title="1. Acceptance of these terms">
         <p>
-          These terms govern your use of Lumiticket, a platform operated by
+          These terms govern your use of Lumticket, a platform operated by
           Lumina Holdings Ltd for bus ticketing, parcel logistics, and event
           ticketing across the SADC region. By creating an account, booking a
-          trip, sending a parcel, or buying a ticket through Lumiticket, you
+          trip, sending a parcel, or buying a ticket through Lumticket, you
           agree to these terms.
         </p>
       </LegalSection>
 
-      <LegalSection title="2. What Lumiticket is — and isn&apos;t">
+      <LegalSection title="2. What Lumticket is — and isn&apos;t">
         <p>
-          Lumiticket connects customers with independently operated bus
+          Lumticket connects customers with independently operated bus
           operators, courier operators, event organizers, and retail agents.
           We provide the booking, ticketing, and validation platform;
           transport, delivery, and events themselves are provided by the
@@ -44,7 +44,7 @@ export default function TermsPage() {
 
       <LegalSection title="4. Bookings, payments, and settlement">
         <ul className="list-disc space-y-1 pl-5">
-          <li>Payments are processed by licensed third-party payment gateways and mobile money partners. Lumiticket does not hold customer funds.</li>
+          <li>Payments are processed by licensed third-party payment gateways and mobile money partners. Lumticket does not hold customer funds.</li>
           <li>A selected bus seat is held for a limited time (typically 5 minutes) while payment is completed, then released if payment isn&apos;t confirmed.</li>
           <li>Every booking or ticket generates a unique, secure QR code as proof of purchase.</li>
           <li>Funds are split automatically between the operator, platform commission, agent commission, and gateway fees according to each operator&apos;s agreed settlement terms.</li>
@@ -81,7 +81,7 @@ export default function TermsPage() {
 
       <LegalSection title="8. Liability">
         <p>
-          Lumiticket is not liable for the acts or omissions of independent
+          Lumticket is not liable for the acts or omissions of independent
           operators, couriers, or organizers using the platform, beyond our
           role in facilitating booking, payment, and validation. Nothing in
           these terms limits liability that cannot be limited under

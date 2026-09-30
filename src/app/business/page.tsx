@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 
 export const metadata = {
-  title: "For business — Lumiticket",
+  title: "For business — Lumticket",
 };
 
 const roles = [
@@ -50,7 +50,7 @@ export default function BusinessPage() {
       <section className="bg-navy-950">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <p className="text-xs font-semibold uppercase tracking-wide text-gold-400">
-            Partner with Lumiticket
+            Partner with Lumticket
           </p>
           <h1 className="mt-3 max-w-2xl text-3xl font-bold text-white sm:text-4xl">
             Reach more customers across the SADC region

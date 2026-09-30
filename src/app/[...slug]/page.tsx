@@ -20,7 +20,7 @@ export default async function CatchAllPage(props: PageProps<"/[...slug]">) {
       </span>
       <h1 className="mt-2 text-3xl font-bold text-navy-950">{title}</h1>
       <p className="mt-3 text-ink-muted">
-        This page is part of the Lumiticket template and hasn&apos;t been
+        This page is part of the Lumticket template and hasn&apos;t been
         built out yet — a good next stop when wiring up this route.
       </p>
       <div className="mt-6 flex gap-3">

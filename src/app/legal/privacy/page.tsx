@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
-  title: "Privacy policy — Lumiticket",
+  title: "Privacy policy — Lumticket",
 };
 
 export default function PrivacyPage() {
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
       <LegalSection title="3. Payment data">
         <p>
           Payments are processed by licensed third-party payment gateways and
-          mobile money providers. Lumiticket does not store raw payment card
+          mobile money providers. Lumticket does not store raw payment card
           data, and does not hold customer funds directly — funds are split
           and settled by the gateway according to each operator&apos;s
           settlement rules.
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="8. Cookies and local storage">
         <p>
-          The Lumiticket web app stores your session and recently issued QR
+          The Lumticket web app stores your session and recently issued QR
           tickets in your browser&apos;s local storage so they remain
           available offline. This data stays on your device and is not
           shared with third parties.

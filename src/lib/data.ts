@@ -165,7 +165,7 @@ export const howItWorks = [
   {
     step: "02",
     title: "Book & pay your way",
-    body: "Pay online by card or mobile money, or reserve now and pay at any Lumiticket retail agent.",
+    body: "Pay online by card or mobile money, or reserve now and pay at any Lumticket retail agent.",
   },
   {
     step: "03",

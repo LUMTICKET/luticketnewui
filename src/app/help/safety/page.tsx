@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
-  title: "Trust & safety — Lumiticket",
+  title: "Trust & safety — Lumticket",
 };
 
 export default function TrustSafetyPage() {
@@ -33,7 +33,7 @@ export default function TrustSafetyPage() {
       <LegalSection title="Payment security">
         <p>
           Payments are processed by licensed third-party payment gateways
-          and mobile money partners. Lumiticket does not store raw payment
+          and mobile money partners. Lumticket does not store raw payment
           card data, and does not hold customer funds directly.
         </p>
       </LegalSection>

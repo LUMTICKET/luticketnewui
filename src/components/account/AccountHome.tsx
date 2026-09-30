@@ -217,7 +217,7 @@ export function AccountHome() {
 
       <div className="mt-10 flex flex-col items-start justify-between gap-4 rounded-2xl border border-line p-6 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-lg font-bold text-navy-950">Run a business on Lumiticket?</h2>
+          <h2 className="text-lg font-bold text-navy-950">Run a business on Lumticket?</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Bus operators, couriers, event organizers and retail agents each get their own workspace.
           </p>

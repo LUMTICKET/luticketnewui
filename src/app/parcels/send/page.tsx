@@ -37,7 +37,7 @@ export default function SendParcelPage() {
     if (!loggedIn) {
       // Guests get the quote; registering requires an account because the
       // parcel lives on the authenticated customer's record.
-      setError("Create an account or log in first — parcels are registered against your Lumiticket account.");
+      setError("Create an account or log in first — parcels are registered against your Lumticket account.");
       return;
     }
 

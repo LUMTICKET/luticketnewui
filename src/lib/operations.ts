@@ -1,4 +1,4 @@
-// Typed client for the Lumiticket operational API (catalog, bookings, parcels,
+// Typed client for the Lumticket operational API (catalog, bookings, parcels,
 // fleet, schedules, drivers/assignments, couriers, compliance, validations,
 // POS, settlements and platform administration).
 //

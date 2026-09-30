@@ -3,7 +3,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { PUBLIC_ROLES, isAccountRole, safeNext } from "@/lib/roles";
 
 export const metadata = {
-  title: "Sign in — Lumiticket",
+  title: "Sign in — Lumticket",
 };
 
 export default async function LoginPage(props: PageProps<"/login">) {
@@ -23,7 +23,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
       <p className="mt-1 text-sm text-ink-muted">
         {staffPortal
           ? "Sign in to the Lumina Holdings staff console."
-          : "Choose how you use Lumiticket — we'll take you straight to your workspace."}
+          : "Choose how you use Lumticket — we'll take you straight to your workspace."}
       </p>
 
       <AuthForm mode="login" initialRole={initialRole} portal={staffPortal ? "staff" : undefined} next={next} />
@@ -38,7 +38,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
       ) : (
         <>
           <p className="mt-6 text-center text-sm text-ink-muted">
-            New to Lumiticket?{" "}
+            New to Lumticket?{" "}
             <Link href={signupHref} className="font-semibold text-navy-950 hover:text-gold-600">
               Create an account
             </Link>

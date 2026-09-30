@@ -20,13 +20,13 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Lumiticket — Bus tickets, events & parcels across SADC",
+  title: "Lumticket — Bus tickets, events & parcels across SADC",
   description:
     "Search bus routes, book event tickets, and send parcels across the SADC region with secure QR tickets and live tracking.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Lumiticket",
+    title: "Lumticket",
   },
 };
 

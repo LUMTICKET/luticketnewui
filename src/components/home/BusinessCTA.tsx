@@ -19,7 +19,7 @@ const audiences = [
   },
   {
     title: "Retail & POS agents",
-    body: "Sell tickets and register parcels on Lumiticket's behalf, in person.",
+    body: "Sell tickets and register parcels on Lumticket's behalf, in person.",
     href: "/business/agents",
   },
 ];
@@ -31,7 +31,7 @@ export function BusinessCTA() {
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
           <div className="max-w-xl">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Grow your business on Lumiticket
+              Grow your business on Lumticket
             </h2>
             <p className="mt-3 text-navy-200">
               Join operators, couriers, organizers, and agents across the

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 
 export const metadata = {
-  title: "You're offline — Lumiticket",
+  title: "You're offline — Lumticket",
 };
 
 export default function OfflinePage() {

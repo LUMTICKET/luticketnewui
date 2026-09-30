@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Lumiticket — Bus tickets, events & parcels",
-    short_name: "Lumiticket",
+    name: "Lumticket — Bus tickets, events & parcels",
+    short_name: "Lumticket",
     description:
       "Search bus routes, book event tickets, and send parcels across the SADC region.",
     start_url: "/",

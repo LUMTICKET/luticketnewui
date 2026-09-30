@@ -1,7 +1,7 @@
 import { TeamWorkspace } from "@/components/team/TeamWorkspace";
 
 export const metadata = {
-  title: "Team — Lumiticket",
+  title: "Team — Lumticket",
 };
 
 export default function TeamPage() {

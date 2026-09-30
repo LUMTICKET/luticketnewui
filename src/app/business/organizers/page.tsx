@@ -4,9 +4,9 @@ import {
 } from "@/components/business/BusinessRolePage";
 
 export const metadata = {
-  title: "For event organizers — Lumiticket",
+  title: "For event organizers — Lumticket",
   description:
-    "Create events, set ticket types, and validate entry at the gate — all from one Lumiticket dashboard.",
+    "Create events, set ticket types, and validate entry at the gate — all from one Lumticket dashboard.",
 };
 
 const content: BusinessRoleContent = {
@@ -53,11 +53,11 @@ const content: BusinessRoleContent = {
   requirements: [
     "National ID or business registration",
     "Venue or council approval for the specific event",
-    "Refund & cancellation policy on file with Lumiticket",
+    "Refund & cancellation policy on file with Lumticket",
     "Event details: date, venue, capacity, and ticket types",
     "A bank account or mobile money wallet for payouts",
   ],
-  payout: "Payouts are released after your event closes, once any refund window has passed, to your linked bank account or mobile money wallet, net of the Lumiticket service fee.",
+  payout: "Payouts are released after your event closes, once any refund window has passed, to your linked bank account or mobile money wallet, net of the Lumticket service fee.",
   faqs: [
     {
       question: "Can I offer multiple ticket types for one event?",

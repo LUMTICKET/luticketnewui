@@ -89,7 +89,7 @@ export default async function EventDetailPage(props: PageProps<"/events/[id]">) 
         )}
         {live && (
           <p role="note" className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-            Live listing published through the Lumiticket platform.
+            Live listing published through the Lumticket platform.
           </p>
         )}
         {!live && (

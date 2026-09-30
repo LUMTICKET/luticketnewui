@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
-  title: "Refunds & cancellations — Lumiticket",
+  title: "Refunds & cancellations — Lumticket",
 };
 
 export default function RefundsPage() {
@@ -12,7 +12,7 @@ export default function RefundsPage() {
         <p>
           Cancellation and refund terms are set by the operator or organizer
           for each specific trip or event, and are always shown before you
-          pay — Lumiticket enforces whatever policy they&apos;ve set rather
+          pay — Lumticket enforces whatever policy they&apos;ve set rather
           than a single platform-wide rule.
         </p>
       </LegalSection>

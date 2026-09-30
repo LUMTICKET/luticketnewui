@@ -94,12 +94,12 @@ export default function ContactPage() {
           <div className="rounded-2xl border border-line p-5">
             <h2 className="text-sm font-bold text-navy-950">Customer support</h2>
             <p className="mt-1 text-sm text-ink-muted">Bookings, parcels, payments, refunds.</p>
-            <p className="mt-2 text-sm font-medium text-navy-950">support@lumiticket.com</p>
+            <p className="mt-2 text-sm font-medium text-navy-950">support@lumticket.com</p>
           </div>
           <div className="rounded-2xl border border-line p-5">
             <h2 className="text-sm font-bold text-navy-950">Business &amp; verification</h2>
             <p className="mt-1 text-sm text-ink-muted">Onboarding, KYC/KYB, settlement.</p>
-            <p className="mt-2 text-sm font-medium text-navy-950">business@lumiticket.com</p>
+            <p className="mt-2 text-sm font-medium text-navy-950">business@lumticket.com</p>
           </div>
           <div className="rounded-2xl border border-line p-5">
             <h2 className="text-sm font-bold text-navy-950">Trust &amp; safety</h2>

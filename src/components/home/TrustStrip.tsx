@@ -9,7 +9,7 @@ const points = [
   },
   {
     title: "Licensed payments",
-    body: "Payments run through licensed gateways and mobile money partners — Lumiticket never holds your funds.",
+    body: "Payments run through licensed gateways and mobile money partners — Lumticket never holds your funds.",
   },
   {
     title: "Built for the region",

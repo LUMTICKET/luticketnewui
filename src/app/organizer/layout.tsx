@@ -1,7 +1,7 @@
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 export const metadata = {
-  title: "Organizer workspace — Lumiticket",
+  title: "Organizer workspace — Lumticket",
   robots: { index: false, follow: false },
 };
 

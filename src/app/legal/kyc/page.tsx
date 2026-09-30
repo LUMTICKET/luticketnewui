@@ -1,7 +1,7 @@
 import { LegalArticle, LegalSection } from "@/components/legal/LegalArticle";
 
 export const metadata = {
-  title: "Verification & KYC policy — Lumiticket",
+  title: "Verification & KYC policy — Lumticket",
 };
 
 export default function KycPolicyPage() {
@@ -13,7 +13,7 @@ export default function KycPolicyPage() {
           organizer completes identity verification (KYC) and, where
           applicable, business verification (KYB) before their account is
           activated. This keeps payouts and tickets trustworthy for everyone
-          who books through Lumiticket, and it&apos;s enforced automatically —
+          who books through Lumticket, and it&apos;s enforced automatically —
           no operator, courier, agent, or organizer account goes live without
           it.
         </p>

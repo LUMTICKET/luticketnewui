@@ -7,7 +7,7 @@ import { SearchBand } from "@/components/search/SearchBand";
 import { ModuleSearchBar } from "@/components/search/ModuleSearchBar";
 
 export const metadata = {
-  title: "Bus tickets — Lumiticket",
+  title: "Bus tickets — Lumticket",
 };
 
 interface DisplayRoute {

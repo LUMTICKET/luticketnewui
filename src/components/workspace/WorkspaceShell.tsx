@@ -257,7 +257,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
             <div className="flex flex-col gap-1.5 border-t border-white/10 px-6 py-4 text-xs">
               <Link href="/" className="text-navy-200 hover:text-white">
-                ← Lumiticket public site
+                ← Lumticket public site
               </Link>
               <Link href="/help" className="text-navy-200 hover:text-white">
                 Help centre

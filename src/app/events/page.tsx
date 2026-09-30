@@ -7,7 +7,7 @@ import { ModuleSearchBar } from "@/components/search/ModuleSearchBar";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Events — Lumiticket",
+  title: "Events — Lumticket",
 };
 
 const statusTone = {
