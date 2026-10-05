@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { countries } from "@/lib/data";
-import { createBusinessProfile } from "@/lib/auth";
 import { updateBusinessProfile } from "@/lib/operations";
+import { getRegistrationStatus, registerBusiness } from "@/lib/auth-flow";
+import { fetchBusinessTypes, type BusinessType } from "@/lib/business-types";
 import { ROLES, clearSignupDraft, getSignupDraft } from "@/lib/roles";
 import { Card, PageHeader, inputClass } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
@@ -19,6 +20,28 @@ export function BusinessProfilePanel() {
   // Sign-up captured the business name and individual/company choice; use them as the starting point.
   const [draftName] = useState(() => getSignupDraft()?.businessName ?? "");
   const [draftAccountType] = useState(() => getSignupDraft()?.accountType ?? "company");
+  // GET /api/business/register is the authoritative onboarding state: it reports
+  // whether a business exists and which KYB fields are still empty.
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([]);
+  const [typesFailed, setTypesFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRegistrationStatus().then((status) => {
+      if (!cancelled) setMissingFields(status.missingFields);
+    });
+    fetchBusinessTypes()
+      .then((types) => {
+        if (!cancelled) setBusinessTypes(types);
+      })
+      .catch(() => {
+        if (!cancelled) setTypesFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,17 +80,18 @@ export function BusinessProfilePanel() {
 
     try {
       const data = new FormData(form);
-      await createBusinessProfile(token, {
-        businessName: String(data.get("businessName") || ""),
-        email: String(data.get("email") || ""),
-        phone: String(data.get("phone") || ""),
-        address: String(data.get("address") || ""),
-        city: String(data.get("city") || ""),
+      // The API's intended first step is deliberately minimal: only the
+      // business type and name are required. Everything else is collected by
+      // the details form below, so onboarding never stalls on a long form.
+      const result = await registerBusiness({
+        businessType: String(data.get("businessType") || ""),
+        businessName: String(data.get("businessName") || "").trim(),
+        type: String(data.get("type") || "company") as "individual" | "company",
         country: String(data.get("country") || ""),
-        type: String(data.get("type") || "company"),
-        website: String(data.get("website") || ""),
-        description: String(data.get("description") || ""),
+        phone: String(data.get("phone") || ""),
+        email: String(data.get("email") || ""),
       });
+      setMissingFields(result.missingFields ?? []);
       clearSignupDraft();
       await reloadProfile();
     } catch (createError) {
@@ -76,6 +100,12 @@ export function BusinessProfilePanel() {
       setBusy(false);
     }
   }
+
+  // The business type recorded on the account is the safe default, so the
+  // select is never left with nothing to submit if the list fails to load.
+  const storedTypeSlug = typeof user?.businessType === "object" && user.businessType !== null
+    ? (user.businessType as { slug?: string }).slug
+    : undefined;
 
   const defaultCountry = countries.some((c) => c.code === user?.country) ? String(user?.country) : countries[0].code;
 
@@ -96,9 +126,10 @@ export function BusinessProfilePanel() {
 
       {profile === null && (
         <Card className="mt-8">
-          <h2 className="text-lg font-bold text-navy-950">Create your business profile</h2>
+          <h2 className="text-lg font-bold text-navy-950">Register your business</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Settlement payouts are only enabled once the payout account name matches the verified business name.
+            Two details get you set up. The API creates the profile with an empty KYB form, and you finish
+            the remaining details from this same screen straight after.
           </p>
 
           <form onSubmit={handleCreate} className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -107,27 +138,46 @@ export function BusinessProfilePanel() {
               <input id="businessName" name="businessName" required defaultValue={draftName} className={`mt-1.5 ${inputClass} h-12`} placeholder="Nyasa Express Ltd" />
             </div>
             <div>
-              <label htmlFor="type" className="text-sm font-medium text-ink">Business type</label>
+              <label htmlFor="businessType" className="text-sm font-medium text-ink">Business type</label>
+              <select
+                id="businessType"
+                name="businessType"
+                required
+                defaultValue={storedTypeSlug ?? businessTypes[0]?.slug}
+                className={`mt-1.5 ${inputClass} h-12`}
+              >
+                {businessTypes.length === 0 && (
+                  <option value={storedTypeSlug ?? ""}>
+                    {typesFailed ? "Could not load types — use your saved selection" : "Loading business types…"}
+                  </option>
+                )}
+                {businessTypes.map((type) => (
+                  <option key={type.id} value={type.slug}>{type.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="type" className="text-sm font-medium text-ink">Legal structure</label>
               <select id="type" name="type" defaultValue={draftAccountType} className={`mt-1.5 ${inputClass} h-12`}>
                 <option value="company">Registered company</option>
                 <option value="individual">Individual / sole trader</option>
               </select>
             </div>
             <div>
-              <label htmlFor="business-email" className="text-sm font-medium text-ink">Business email</label>
-              <input id="business-email" name="email" type="email" required defaultValue={user?.email?.includes("@") ? user.email : ""} className={`mt-1.5 ${inputClass} h-12`} placeholder="business@example.com" />
+              <label htmlFor="business-email" className="text-sm font-medium text-ink">Business email (optional)</label>
+              <input id="business-email" name="email" type="email" defaultValue={user?.email?.includes("@") ? user.email : ""} className={`mt-1.5 ${inputClass} h-12`} placeholder="business@example.com" />
             </div>
             <div>
-              <label htmlFor="phone" className="text-sm font-medium text-ink">Phone</label>
-              <input id="phone" name="phone" required className={`mt-1.5 ${inputClass} h-12`} placeholder="+265 999 000 000" />
+              <label htmlFor="phone" className="text-sm font-medium text-ink">Phone (optional)</label>
+              <input id="phone" name="phone" className={`mt-1.5 ${inputClass} h-12`} placeholder="+265 999 000 000" />
             </div>
             <div className="sm:col-span-2">
-              <label htmlFor="address" className="text-sm font-medium text-ink">Address</label>
-              <input id="address" name="address" required className={`mt-1.5 ${inputClass} h-12`} placeholder="123 Main Street" />
+              <label htmlFor="address" className="text-sm font-medium text-ink">Address (optional)</label>
+              <input id="address" name="address" className={`mt-1.5 ${inputClass} h-12`} placeholder="123 Main Street" />
             </div>
             <div>
-              <label htmlFor="city" className="text-sm font-medium text-ink">City</label>
-              <input id="city" name="city" required className={`mt-1.5 ${inputClass} h-12`} placeholder="Lilongwe" />
+              <label htmlFor="city" className="text-sm font-medium text-ink">City (optional)</label>
+              <input id="city" name="city" className={`mt-1.5 ${inputClass} h-12`} placeholder="Lilongwe" />
             </div>
             <div>
               <label htmlFor="profile-country" className="text-sm font-medium text-ink">Country</label>
@@ -153,10 +203,18 @@ export function BusinessProfilePanel() {
             )}
 
             <Button type="submit" variant="accent" size="lg" disabled={busy} className="sm:col-span-2">
-              {busy ? "Creating…" : "Create business profile"}
+              {busy ? "Registering…" : "Register business"}
             </Button>
           </form>
         </Card>
+      )}
+
+      {profile && missingFields.length > 0 && (
+        <p role="status" className="mt-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
+          <strong>Finish your business details.</strong> The API still needs{" "}
+          {missingFields.join(", ")} before this profile is complete — payouts and
+          publishing stay limited until then.
+        </p>
       )}
 
       {profile && (
@@ -269,7 +327,7 @@ export function BusinessProfilePanel() {
                 setEditing(true);
               }}
             >
-              Edit business details
+              {missingFields.length > 0 ? "Complete business details" : "Edit business details"}
             </Button>
           )}
         </Card>

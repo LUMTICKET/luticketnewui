@@ -14,9 +14,37 @@ export interface AuthUser {
   email: string;
   name?: string;
   country?: string;
+  /** Unique per-account Business ID (e.g. LMT-8F3K2QZ4); also a login identifier. */
+  businessId?: string;
+  /** Optional second login identifier alongside email. */
+  phone?: string | null;
   /** Linked business type from the API's business_types table (signup / Google first sign-in). */
   businessType?: BusinessType | null;
+  /** True once the account owns or has joined a business. */
+  isInBusiness?: boolean;
+  /** Which business profile the account operates inside. */
+  businessProfileId?: number | string | null;
+  businessName?: string | null;
+  /** `owner` for owners, or the invited team role (admin / operator / viewer). */
+  role?: string | null;
+  /** `["*"]` for owners, otherwise the team role's permission set. */
+  permissions?: string[];
+  /** Whether password logins require the emailed second factor. */
+  twoFactorEnabled?: boolean;
   [key: string]: unknown;
+}
+
+/**
+ * Where the API wants a freshly authenticated account to go next. Every
+ * session-producing endpoint (signup, login, 2FA, Google, invitation accept)
+ * returns one — never infer onboarding state from local flags.
+ */
+export type NextStep = "register-business" | "complete-profile" | "dashboard";
+
+/** A session-producing endpoint's payload: tokens plus the account of record. */
+export interface SessionPayload extends AuthSession {
+  user?: AuthUser;
+  nextStep?: NextStep;
 }
 
 export interface BusinessProfile {
@@ -391,7 +419,12 @@ export async function authRequest<T>(
     | null;
 
   if (!response.ok) {
-    throw new Error(payload?.message || payload?.error || "Authentication failed. Please try again.");
+    // ApiError (not a plain Error) so callers can branch on status — the 2FA
+    // endpoint has distinct meanings for 401/410/429/502.
+    throw new ApiError(
+      payload?.message || payload?.error || "Authentication failed. Please try again.",
+      response.status,
+    );
   }
 
   return payload as T;

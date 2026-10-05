@@ -15,6 +15,8 @@ import {
   saveAuthUser,
   type AuthSession,
   type AuthUser,
+  type NextStep,
+  type SessionPayload,
 } from "@/lib/auth";
 import {
   PUBLIC_ROLES,
@@ -30,6 +32,8 @@ import {
   type AccountRole,
 } from "@/lib/roles";
 import { fetchBusinessTypes, workspaceForBusinessType, type BusinessType } from "@/lib/business-types";
+import { signIn, onboardingDestination, type TwoFactorChallenge } from "@/lib/auth-flow";
+import { TwoFactorChallengeForm } from "@/components/auth/TwoFactorChallengeForm";
 import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { RoleIcon, RoleSelector, BusinessTypeSelector } from "@/components/auth/RoleSelector";
 
@@ -66,6 +70,9 @@ export function AuthForm({
   // selection is sent as `businessType` on signup and Google first sign-in.
   const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([]);
   const [businessType, setBusinessType] = useState<string | null>(null);
+  // Set when the password check passes but the API wants the emailed 6-digit
+  // code first. 2FA is on by default, so this is the normal login path.
+  const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
 
   useEffect(() => {
     if (initialRole || isStaffPortal || isSignup) return;
@@ -110,7 +117,7 @@ export function AuthForm({
   }, [isSignup, role, businessTypes]);
 
   const finish = useCallback(
-    async (session: AuthSession, keep: boolean, chosen: AccountRole) => {
+    async (session: AuthSession, keep: boolean, chosen: AccountRole, nextStep?: NextStep) => {
       saveAuthSession(session, keep);
 
       let user: AuthUser | null = null;
@@ -130,7 +137,16 @@ export function AuthForm({
       const finalRole = resolveRole(chosen, user);
       if (user) saveAuthUser(user, keep);
       saveRole(finalRole, keep);
-      router.push(safeNext(next) ?? roleLanding(finalRole));
+
+      // `nextStep` from the API is authoritative for business accounts: one
+      // with no business yet belongs in the business details form, not in a
+      // workspace it can't use. The API returns `register-business` for every
+      // new account including plain customers, who have no profile screen to
+      // go to — so only business roles are redirected.
+      const onboarding = ROLES[finalRole].business
+        ? onboardingDestination(nextStep, `${ROLES[finalRole].landing}/profile`)
+        : null;
+      router.push(safeNext(next) ?? onboarding ?? roleLanding(finalRole));
       router.refresh();
     },
     [next, router],
@@ -178,25 +194,45 @@ export function AuthForm({
         );
       }
 
-      const session = await authRequest<AuthSession>(isSignup ? "/api/auth/signup" : "/api/auth/login", {
-        email: formData.get("email"),
-        password: formData.get("password"),
-        ...(isSignup && {
+      const identifier = String(formData.get("identifier") ?? formData.get("email") ?? "").trim();
+      const password = String(formData.get("password") ?? "");
+
+      if (isSignup) {
+        const session = await authRequest<SessionPayload>("/api/auth/signup", {
+          email: identifier,
+          password,
           name: formData.get("name"),
           country: formData.get("country"),
-          // Required by the API — stored on the user as business_type_id.
+          // Optional for the API (business registration is its own step), but
+          // storing it here drives which workspace the account opens.
           businessType: businessType,
-        }),
-      });
-
-      if (isSignup && ROLES[role].business) {
-        saveSignupDraft({
-          role,
-          businessName: String(formData.get("businessName") || "").trim(),
-          accountType,
         });
+
+        if (ROLES[role].business) {
+          saveSignupDraft({
+            role,
+            businessName: String(formData.get("businessName") || "").trim(),
+            accountType,
+          });
+        }
+        await finish(session, true, role, session.nextStep);
+        return;
       }
-      await finish(session, isSignup || remember, role);
+
+      // Login: one identifier (Business ID, email or phone) plus the password.
+      // 2FA is on by default, so this frequently stops at the emailed code
+      // instead of returning a session.
+      const result = await signIn(identifier, password);
+      if (result.status === "needs2FA") {
+        setChallenge({
+          challengeToken: result.challengeToken,
+          maskedDestination: result.maskedDestination,
+          expiresIn: result.expiresIn,
+        });
+        return;
+      }
+
+      await finish(result, remember, role, result.nextStep);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Authentication failed.");
     } finally {
@@ -208,6 +244,24 @@ export function AuthForm({
   // resolved from the account's stored businessType after sign-in (see finish()).
   const config = ROLES[role];
   const selectedType = businessTypes.find((t) => t.slug === businessType) ?? null;
+
+  // The password was accepted but the API wants the emailed code first, so the
+  // whole form is replaced by the challenge until it is verified or cancelled.
+  if (challenge) {
+    return (
+      <TwoFactorChallengeForm
+        key={challenge.challengeToken}
+        challengeToken={challenge.challengeToken}
+        maskedDestination={challenge.maskedDestination}
+        expiresIn={challenge.expiresIn}
+        onCancel={() => {
+          setChallenge(null);
+          setError("");
+        }}
+        onVerified={(session) => finish(session, remember, role, session.nextStep)}
+      />
+    );
+  }
 
   return (
     <>
@@ -341,8 +395,18 @@ export function AuthForm({
         )}
 
         <div>
-          <label htmlFor="email" className="text-sm font-medium text-ink">Email or mobile number</label>
-          <input id="email" name="email" type="text" required autoComplete="username" className={inputClasses} placeholder="you@example.com" />
+          <label htmlFor="identifier" className="text-sm font-medium text-ink">
+            {isSignup ? "Email address" : "Business ID, email or mobile number"}
+          </label>
+          <input
+            id="identifier"
+            name="identifier"
+            type="text"
+            required
+            autoComplete="username"
+            className={inputClasses}
+            placeholder={isSignup ? "you@example.com" : "LMT-8F3K2QZ4 or you@example.com"}
+          />
         </div>
 
         <div>
