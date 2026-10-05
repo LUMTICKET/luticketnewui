@@ -8,7 +8,6 @@ import { ROLES } from "@/lib/roles";
 import { workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { formatPrice } from "@/lib/format";
 import { Card, DemoBadge, StatCard } from "../ui";
-import { BusinessIdentityCard } from "./BusinessIdentityCard";
 import { useWorkspace } from "../WorkspaceContext";
 import { useDashboardData } from "../useDashboardData";
 
@@ -210,8 +209,6 @@ export function WorkspaceOverview() {
         )}
         {profileError && <p role="alert" className="mt-4 text-sm text-gold-300">{profileError}</p>}
       </section>
-
-      <BusinessIdentityCard />
 
       {config.business && (
         <Card>
