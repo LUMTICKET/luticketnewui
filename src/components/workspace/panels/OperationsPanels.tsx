@@ -5,11 +5,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatPrice } from "@/lib/format";
 import {
-  busCompliance,
-  courierCompliance,
-  type ComplianceItem,
-} from "@/lib/workspace-mock";
-import {
   createAssignment,
   createBusBooking,
   createComplianceDocument,
@@ -785,11 +780,6 @@ export function CourierDispatchPanel() {
 // ---------------------------------------------------------------------------
 // Compliance (bus + courier)
 // ---------------------------------------------------------------------------
-const fallbackCompliance: { bus: ComplianceItem[]; courier: ComplianceItem[] } = {
-  bus: busCompliance,
-  courier: courierCompliance,
-};
-
 function complianceStatus(item: { daysLeft?: number }) {
   const days = item.daysLeft ?? 0;
   if (days < 0) return { label: "Lapsed", tone: "error" } as const;
@@ -797,7 +787,7 @@ function complianceStatus(item: { daysLeft?: number }) {
   return { label: "Valid", tone: "success" } as const;
 }
 
-function ComplianceSection({ fallbackKey, description }: { fallbackKey: "bus" | "courier"; description: string }) {
+function ComplianceSection({ description }: { description: string }) {
   const { items, setItems, error, setError, reload } = useApiList(listCompliance);
   const [busy, setBusy] = useState(false);
 
@@ -840,9 +830,10 @@ function ComplianceSection({ fallbackKey, description }: { fallbackKey: "bus" | 
     <div>
       <PageHeader title="Compliance" description={description} />
 
-      {documents.length === 0 && fallbackCompliance[fallbackKey].length > 0 && !error && (
-        <p role="note" className="mt-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
-          No compliance documents on file yet. The sample rows below show the kinds of documents to register.
+      {documents.length === 0 && !error && (
+        <p role="note" className="mt-6 rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">
+          No compliance documents on file yet. Add the operator licence, roadworthiness
+          certificate and insurance below — lapsed documents flag the account automatically.
         </p>
       )}
       {(lapsed > 0 || expiring > 0) && (
@@ -862,54 +853,31 @@ function ComplianceSection({ fallbackKey, description }: { fallbackKey: "bus" | 
 
       <ErrorNotice message={error} onRetry={reload} />
 
-      {documents.length === 0 ? (
-        <div className="mt-6">
-          <TableShell>
-            <THead columns={["Item", "Subject", "Expires", "Status"]} />
-            <tbody>
-              {fallbackCompliance[fallbackKey].map((item) => {
-                const status = item.daysLeft < 0 ? { label: "Lapsed", tone: "error" as const } : item.daysLeft <= 30 ? { label: `Expires in ${item.daysLeft}d`, tone: "warning" as const } : { label: "Valid", tone: "success" as const };
-                return (
-                  <tr key={item.id} className={rowClass}>
-                    <td className={`${cell} font-medium text-navy-950`}>{item.kind}</td>
-                    <td className={`${cell} text-ink-muted`}>{item.subject}</td>
-                    <td className={`${cell} text-ink-muted`}>{item.expires}</td>
-                    <td className={cell}>
-                      <Badge tone={status.tone}>{status.label}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </TableShell>
-        </div>
-      ) : (
-        <div className="mt-6">
-          <TableShell>
-            <THead columns={["Item", "Subject", "Expires", "Status", ""]} />
-            <tbody>
-              {documents.map((item) => {
-                const status = complianceStatus(item);
-                return (
-                  <tr key={item.id} className={rowClass}>
-                    <td className={`${cell} font-medium text-navy-950`}>{item.kind}</td>
-                    <td className={`${cell} text-ink-muted`}>{item.subject}</td>
-                    <td className={`${cell} text-ink-muted`}>{item.expiresAt?.slice(0, 10) ?? "—"}</td>
-                    <td className={cell}>
-                      <Badge tone={status.tone}>{status.label}</Badge>
-                    </td>
-                    <td className={`${cell} text-right`}>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => void remove(item)}>
-                        Remove
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </TableShell>
-        </div>
-      )}
+      <div className="mt-6">
+        <TableShell>
+          <THead columns={["Item", "Subject", "Expires", "Status", ""]} />
+          <tbody>
+            {documents.map((item) => {
+              const status = complianceStatus(item);
+              return (
+                <tr key={item.id} className={rowClass}>
+                  <td className={`${cell} font-medium text-navy-950`}>{item.kind}</td>
+                  <td className={`${cell} text-ink-muted`}>{item.subject}</td>
+                  <td className={`${cell} text-ink-muted`}>{item.expiresAt?.slice(0, 10) ?? "—"}</td>
+                  <td className={cell}>
+                    <Badge tone={status.tone}>{status.label}</Badge>
+                  </td>
+                  <td className={`${cell} text-right`}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => void remove(item)}>
+                      Remove
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </TableShell>
+      </div>
 
       <Card className="mt-6">
         <h2 className="text-lg font-bold text-navy-950">Register a document</h2>
@@ -930,7 +898,6 @@ function ComplianceSection({ fallbackKey, description }: { fallbackKey: "bus" | 
 export function BusCompliancePanel() {
   return (
     <ComplianceSection
-      fallbackKey="bus"
       description="Operator licence, roadworthiness and public service vehicle insurance. Lapsed documents flag or suspend the account automatically."
     />
   );
@@ -939,7 +906,6 @@ export function BusCompliancePanel() {
 export function CourierCompliancePanel() {
   return (
     <ComplianceSection
-      fallbackKey="courier"
       description="Courier operating licence, vehicle registrations, rider licences and Goods-in-Transit insurance. Lapsed documents flag or suspend the account automatically."
     />
   );
