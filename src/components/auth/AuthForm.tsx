@@ -21,7 +21,6 @@ import {
 import {
   PUBLIC_ROLES,
   ROLES,
-  businessTypeFromServer,
   getLastRole,
   resolveRole,
   roleLanding,
@@ -31,11 +30,10 @@ import {
   staffAccess,
   type AccountRole,
 } from "@/lib/roles";
-import { fetchBusinessTypes, workspaceForBusinessType, type BusinessType } from "@/lib/business-types";
 import { signIn, onboardingDestination, type TwoFactorChallenge } from "@/lib/auth-flow";
 import { TwoFactorChallengeForm } from "@/components/auth/TwoFactorChallengeForm";
 import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
-import { RoleIcon, RoleSelector, BusinessTypeSelector } from "@/components/auth/RoleSelector";
+import { RoleIcon, RoleSelector } from "@/components/auth/RoleSelector";
 
 type AuthMode = "login" | "signup";
 
@@ -66,10 +64,6 @@ export function AuthForm({
   // the signup draft, the same way businessName already is.
   const [accountType, setAccountType] = useState<"individual" | "company">("company");
 
-  // Business types come from the API database (GET /api/business-types). The
-  // selection is sent as `businessType` on signup and Google first sign-in.
-  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([]);
-  const [businessType, setBusinessType] = useState<string | null>(null);
   // Set when the password check passes but the API wants the emailed 6-digit
   // code first. 2FA is on by default, so this is the normal login path.
   const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
@@ -81,40 +75,6 @@ export function AuthForm({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (last) setRole(last);
   }, [initialRole, isStaffPortal, isSignup]);
-
-  useEffect(() => {
-    if (!isSignup) return;
-    let cancelled = false;
-    fetchBusinessTypes()
-      .then((types) => {
-        if (!cancelled) setBusinessTypes(types);
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load business types. Check your connection and try again.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isSignup]);
-
-  useEffect(() => {
-    if (!isSignup || businessTypes.length === 0) return;
-    // Business type is a required field on the API's signup call for every
-    // account, but only business roles are actually asked about it (see the
-    // render below) — a plain customer should never have to think about
-    // "Event Organizer" vs "Bus Operator" just to book a ticket. Bus operator
-    // and organizer map onto a real seeded type; courier and retail/POS
-    // agent don't have one yet (see DATABASE-REQUIREMENTS.md), so those two
-    // are left for the person to pick manually from what's available.
-    if (role === "bus-operator") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBusinessType("bus-operator");
-    } else if (role === "organizer") {
-      setBusinessType("event-organizer");
-    } else if (!ROLES[role].business) {
-      setBusinessType((current) => current ?? businessTypes[0]?.slug ?? null);
-    }
-  }, [isSignup, role, businessTypes]);
 
   const finish = useCallback(
     async (session: AuthSession, keep: boolean, chosen: AccountRole, nextStep?: NextStep) => {
@@ -138,15 +98,23 @@ export function AuthForm({
       if (user) saveAuthUser(user, keep);
       saveRole(finalRole, keep);
 
-      // `nextStep` from the API is authoritative for business accounts: one
-      // with no business yet belongs in the business details form, not in a
-      // workspace it can't use. The API returns `register-business` for every
-      // new account including plain customers, who have no profile screen to
-      // go to — so only business roles are redirected.
+      // Every account picks its business type on its own page, so that choice is
+      // never a distraction on the sign-up or sign-in form. An account with no
+      // stored type is sent there before anything else; `nextStep` from the API
+      // then decides whether a business still has to be registered. The API
+      // returns `register-business` for every new account including plain
+      // customers, who have no profile screen to go to.
+      //
+      // Staff are excluded: they are provisioned by an administrator, never
+      // self-registered, and operate the platform rather than a business — so
+      // they have no business type and must not be sent to pick one.
+      const needsType = finalRole !== "staff" && !user?.businessType;
       const onboarding = ROLES[finalRole].business
         ? onboardingDestination(nextStep, `${ROLES[finalRole].landing}/profile`)
         : null;
-      router.push(safeNext(next) ?? onboarding ?? roleLanding(finalRole));
+      router.push(
+        safeNext(next) ?? (needsType ? "/business-type" : null) ?? onboarding ?? roleLanding(finalRole),
+      );
       router.refresh();
     },
     [next, router],
@@ -161,14 +129,13 @@ export function AuthForm({
         const profile = decodeJwtPayload(idToken);
         if (!profile.email) throw new Error("No email found in Google account.");
 
-        // First-time Google sign-in must select a business type (required by the
-        // API); returning users keep their stored type, so none is sent.
+        // The business type is chosen on its own page after sign-in, so it is
+        // never sent here — Google sign-in only establishes the account.
         const session = await googleAuth(
           idToken,
           profile.email,
           profile.name || profile.given_name || "",
           profile.picture || "",
-          businessType ?? undefined,
         );
         await finish(session, true, role);
       } catch (requestError) {
@@ -177,7 +144,7 @@ export function AuthForm({
         setBusy(false);
       }
     },
-    [finish, role, businessType],
+    [finish, role],
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -188,12 +155,6 @@ export function AuthForm({
     try {
       const formData = new FormData(event.currentTarget);
 
-      if (isSignup && !businessType) {
-        throw new Error(
-          config.business ? "Choose your business type to continue." : "Still setting things up — try again in a moment.",
-        );
-      }
-
       const identifier = String(formData.get("identifier") ?? formData.get("email") ?? "").trim();
       const password = String(formData.get("password") ?? "");
 
@@ -203,9 +164,6 @@ export function AuthForm({
           password,
           name: formData.get("name"),
           country: formData.get("country"),
-          // Optional for the API (business registration is its own step), but
-          // storing it here drives which workspace the account opens.
-          businessType: businessType,
         });
 
         if (ROLES[role].business) {
@@ -243,7 +201,6 @@ export function AuthForm({
   // On login the form's role choice is only a navigation hint; the workspace is
   // resolved from the account's stored businessType after sign-in (see finish()).
   const config = ROLES[role];
-  const selectedType = businessTypes.find((t) => t.slug === businessType) ?? null;
 
   // The password was accepted but the API wants the emailed code first, so the
   // whole form is replaced by the challenge until it is verified or cancelled.
@@ -294,31 +251,6 @@ export function AuthForm({
               : `You'll land in: ${config.workspace}.`}
           </p>
 
-          {isSignup && !isStaffPortal && config.business && (
-            <div className="mt-4">
-              <BusinessTypeSelector
-                types={businessTypes}
-                value={businessType}
-                onChange={(slug) => {
-                  setBusinessType(slug);
-                  // Courier and retail/POS agent have no seeded business type
-                  // of their own yet (see business-types.ts), so whichever
-                  // type they pick here is just a required-field placeholder
-                  // — it must not silently switch their workspace away from
-                  // the one they deliberately chose above.
-                  if (role === "courier" || role === "agent") return;
-                  const workspace = workspaceForBusinessType({ slug });
-                  if (workspace) setRole(workspace);
-                }}
-                label={businessTypes.length > 0 ? "Business type" : "Loading business types…"}
-              />
-              <p className="mt-2.5 text-xs text-ink-muted">
-                {selectedType
-                  ? `Saved to your account as “${selectedType.name}” — your dashboard follows this business.`
-                  : "Pick the business you run; it's stored on your account and drives your workspace."}
-              </p>
-            </div>
-          )}
         </div>
       )}
 
