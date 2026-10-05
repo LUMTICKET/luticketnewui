@@ -30,6 +30,7 @@ import {
   staffAccess,
   type AccountRole,
 } from "@/lib/roles";
+import { fetchBusinessTypes, workspaceForBusinessType, type BusinessType } from "@/lib/business-types";
 import { signIn, onboardingDestination, type TwoFactorChallenge } from "@/lib/auth-flow";
 import { TwoFactorChallengeForm } from "@/components/auth/TwoFactorChallengeForm";
 import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
@@ -64,6 +65,10 @@ export function AuthForm({
   // the signup draft, the same way businessName already is.
   const [accountType, setAccountType] = useState<"individual" | "company">("company");
 
+  // Business types come from the API database (GET /api/business-types). The
+  // selection is sent as `businessType` on signup and Google first sign-in.
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([]);
+  const [businessType, setBusinessType] = useState<string | null>(null);
   // Set when the password check passes but the API wants the emailed 6-digit
   // code first. 2FA is on by default, so this is the normal login path.
   const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
@@ -98,23 +103,15 @@ export function AuthForm({
       if (user) saveAuthUser(user, keep);
       saveRole(finalRole, keep);
 
-      // Every account picks its business type on its own page, so that choice is
-      // never a distraction on the sign-up or sign-in form. An account with no
-      // stored type is sent there before anything else; `nextStep` from the API
-      // then decides whether a business still has to be registered. The API
-      // returns `register-business` for every new account including plain
-      // customers, who have no profile screen to go to.
-      //
-      // Staff are excluded: they are provisioned by an administrator, never
-      // self-registered, and operate the platform rather than a business — so
-      // they have no business type and must not be sent to pick one.
-      const needsType = finalRole !== "staff" && !user?.businessType;
+      // `nextStep` from the API is authoritative for business accounts: one
+      // with no business yet belongs in the business details form, not in a
+      // workspace it can't use. The API returns `register-business` for every
+      // new account including plain customers, who have no profile screen to
+      // go to — so only business roles are redirected.
       const onboarding = ROLES[finalRole].business
         ? onboardingDestination(nextStep, `${ROLES[finalRole].landing}/profile`)
         : null;
-      router.push(
-        safeNext(next) ?? (needsType ? "/business-type" : null) ?? onboarding ?? roleLanding(finalRole),
-      );
+      router.push(safeNext(next) ?? onboarding ?? roleLanding(finalRole));
       router.refresh();
     },
     [next, router],
@@ -158,12 +155,18 @@ export function AuthForm({
       const identifier = String(formData.get("identifier") ?? formData.get("email") ?? "").trim();
       const password = String(formData.get("password") ?? "");
 
+      const identifier = String(formData.get("identifier") ?? formData.get("email") ?? "").trim();
+      const password = String(formData.get("password") ?? "");
+
       if (isSignup) {
         const session = await authRequest<SessionPayload>("/api/auth/signup", {
           email: identifier,
           password,
           name: formData.get("name"),
           country: formData.get("country"),
+          // Optional for the API (business registration is its own step), but
+          // storing it here drives which workspace the account opens.
+          businessType: businessType,
         });
 
         if (ROLES[role].business) {
@@ -201,6 +204,24 @@ export function AuthForm({
   // On login the form's role choice is only a navigation hint; the workspace is
   // resolved from the account's stored businessType after sign-in (see finish()).
   const config = ROLES[role];
+
+  // The password was accepted but the API wants the emailed code first, so the
+  // whole form is replaced by the challenge until it is verified or cancelled.
+  if (challenge) {
+    return (
+      <TwoFactorChallengeForm
+        key={challenge.challengeToken}
+        challengeToken={challenge.challengeToken}
+        maskedDestination={challenge.maskedDestination}
+        expiresIn={challenge.expiresIn}
+        onCancel={() => {
+          setChallenge(null);
+          setError("");
+        }}
+        onVerified={(session) => finish(session, remember, role, session.nextStep)}
+      />
+    );
+  }
 
   // The password was accepted but the API wants the emailed code first, so the
   // whole form is replaced by the challenge until it is verified or cancelled.
