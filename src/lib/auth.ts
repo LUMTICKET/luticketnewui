@@ -387,7 +387,9 @@ export function googleAuth(
   avatar: string,
   businessType?: string,
 ) {
-  return authRequest<AuthSession>("/api/auth/google", {
+  // Like every session-producing endpoint, Google sign-in returns nextStep —
+  // "register-business" for a first-time account that must pick a venture.
+  return authRequest<SessionPayload>("/api/auth/google", {
     idToken,
     email,
     name,
