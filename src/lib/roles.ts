@@ -1,11 +1,16 @@
 // Account roles and the workspace each one lands in after signing in.
 //
-// The API currently returns no explicit account type, so the role chosen at
-// sign-up / sign-in is remembered in the browser and used to route people to
-// the right workspace. This is navigation, not authorization: every privileged
-// action must still be enforced by the API. If the API starts returning a role
-// (`role`, `roles[]` or `accountType` on /api/auth/me) it takes precedence —
-// see `resolveRole`.
+// The workspace is resolved from the account of record: the business type
+// stored on the user (`user.businessType`, the `business_types` table the API
+// seeded) decides where a signed-in account lands. This is navigation, not
+// authorization: every privileged action must still be enforced by the API.
+// An account without a stored business type goes to the venture-selection
+// screen (/onboarding/business-type) before it reaches a dashboard.
+//
+// Note: `user.role` from the API is the *team* role inside a business
+// (owner / admin / operator / viewer) — never a workspace selector. Mapping
+// it to the staff console here would hand every business admin a platform
+// console, so it is deliberately ignored for routing.
 
 export type AccountRole =
   | "customer"
@@ -161,63 +166,18 @@ export function clearSignupDraft() {
 }
 
 // ---------------------------------------------------------------------------
-// Server-provided roles (used when the API starts returning them)
+// Account-of-record routing
 // ---------------------------------------------------------------------------
 import { workspaceForBusinessType } from "@/lib/business-types";
 type MaybeUser = { email?: unknown; role?: unknown; roles?: unknown; accountType?: unknown } | null | undefined;
 
-const SERVER_ROLE_ALIASES: Record<string, AccountRole> = {
-  admin: "staff",
-  administrator: "staff",
-  staff: "staff",
-  "kyc-reviewer": "staff",
-  support: "staff",
-  "customer-support": "staff",
-  customer: "customer",
-  "bus-operator": "bus-operator",
-  bus: "bus-operator",
-  courier: "courier",
-  "courier-operator": "courier",
-  organizer: "organizer",
-  "event-organizer": "organizer",
-  agent: "agent",
-  "retail-agent": "agent",
-  "pos-agent": "agent",
-  retail: "agent",
-};
-
-export function roleFromServer(user: MaybeUser): AccountRole | null {
-  if (!user) return null;
-  const candidates: unknown[] = [user.role, user.accountType, ...(Array.isArray(user.roles) ? user.roles : [])];
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") continue;
-    const alias = SERVER_ROLE_ALIASES[candidate.trim().toLowerCase().replace(/[_\s]+/g, "-")];
-    if (alias) return alias;
-  }
-  return null;
-}
-
 /**
- * A specific role reported by the server wins over the one selected on the form.
- * "customer" is the default for everyone, so it never overrides a workspace choice.
+ * The workspace the account itself belongs in, from the business type stored
+ * on the user record. `null` means the account hasn't picked a venture yet —
+ * the client should route it to /onboarding/business-type.
  */
-export function resolveRole(selected: AccountRole, user: MaybeUser): AccountRole {
-  const server = roleFromServer(user);
-  if (server && server !== "customer") return server;
-
-  // A deliberate "Customer", "Courier operator" or "Retail / POS agent"
-  // choice is never overridden by businessType. The API requires *every*
-  // signup to carry a businessType, but courier and agent have no seeded
-  // type of their own (see business-types.ts) and every seeded type maps to
-  // some *other* workspace — so whatever they picked to satisfy that
-  // required field is a placeholder, not a real classification, and must
-  // never bounce them out of the workspace they actually chose.
-  if (selected === "customer" || selected === "courier" || selected === "agent") return selected;
-
-  // The API records the selected business type on the user (business_type_id) and
-  // returns it as `user.businessType` — that's the account type of record.
-  const workspace = workspaceForBusinessType(businessTypeFromServer(user));
-  return workspace ?? selected;
+export function resolveRole(user: MaybeUser): AccountRole | null {
+  return workspaceForBusinessType(businessTypeFromServer(user));
 }
 
 /** The businessType object (or bare slug) the API returns on the user record, if any. */
@@ -233,15 +193,15 @@ export function businessTypeFromServer(user: MaybeUser) {
 export type StaffAccess = "granted" | "preview" | "denied";
 
 /**
- * Staff console access. Granted when the API says the account is staff, or when
- * the email domain is on NEXT_PUBLIC_STAFF_EMAIL_DOMAINS. With neither signal
- * available the console opens in clearly-labelled preview mode.
+ * Staff console access. Granted when the email domain is on
+ * NEXT_PUBLIC_STAFF_EMAIL_DOMAINS (the API's platform roles aren't exposed on
+ * /api/auth/me yet). With no domains configured the console opens in
+ * clearly-labelled preview mode.
  */
 export function staffAccess(user: MaybeUser): StaffAccess {
-  const server = roleFromServer(user);
-  if (server === "staff") return "granted";
-  if (server) return "denied";
-
+  // The API doesn't expose platform roles on /api/auth/me (they live in
+  // user_platform_roles), so provisioning is recognised by email domain only;
+  // with no domains configured the console opens in labelled preview mode.
   const domains = (process.env.NEXT_PUBLIC_STAFF_EMAIL_DOMAINS ?? "")
     .split(",")
     .map((domain) => domain.trim().toLowerCase())

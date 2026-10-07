@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ROLES } from "@/lib/roles";
+import { ROLES, businessTypeFromServer } from "@/lib/roles";
+import type { AuthUser } from "@/lib/auth";
 import { workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { formatPrice } from "@/lib/format";
 import { Card, DemoBadge, StatCard } from "../ui";
@@ -102,6 +103,16 @@ const OVERVIEW: Record<WorkspaceRole, OverviewContent> = {
   },
 };
 
+/** Display label for the account's business type — API name first, prettified slug as fallback. */
+function ventureLabel(user: AuthUser | null) {
+  const name = user?.businessType?.name;
+  if (name) return name;
+  const slug = businessTypeFromServer(user)?.slug;
+  if (!slug) return null;
+  const words = slug.replace(/-/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** Human label for an audit action + resource pair. */
 function auditLine(action: string, resourceType: string) {
   const resource = resourceType.replace(/-/g, " ") || "record";
@@ -116,6 +127,8 @@ export function WorkspaceOverview() {
   const config = ROLES[role];
   const content = OVERVIEW[role];
   const firstName = user?.name?.split(" ")[0];
+  const businessName = profile?.businessName ?? user?.businessName ?? null;
+  const ventureType = ventureLabel(user);
 
   // Live data for the signed-in business. Staff has no business profile and
   // keeps the sample KPIs until platform-wide stats exist on the API.
@@ -201,11 +214,35 @@ export function WorkspaceOverview() {
             Complete your business profile
           </LinkButton>
         )}
-        {config.business && profile && (
-          <p className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm">
-            <span className="h-2 w-2 rounded-full bg-gold-400" />
-            {profile.businessName}
-          </p>
+        {/* The account of record, spelled out: who is signed in, their Business
+            ID, the business they operate and the venture type they picked. */}
+        {(user?.name || user?.businessId || businessName || ventureType) && (
+          <dl className="mt-7 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-white/10 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            {user?.name && (
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Signed in as</dt>
+                <dd className="mt-1 truncate font-semibold text-white">{user.name}</dd>
+              </div>
+            )}
+            {user?.businessId && (
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business ID</dt>
+                <dd className="mt-1 truncate font-mono font-semibold text-white">{user.businessId}</dd>
+              </div>
+            )}
+            {businessName && (
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business name</dt>
+                <dd className="mt-1 truncate font-semibold text-white">{businessName}</dd>
+              </div>
+            )}
+            {ventureType && (
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business type</dt>
+                <dd className="mt-1 truncate font-semibold text-white">{ventureType}</dd>
+              </div>
+            )}
+          </dl>
         )}
         {profileError && <p role="alert" className="mt-4 text-sm text-gold-300">{profileError}</p>}
       </section>

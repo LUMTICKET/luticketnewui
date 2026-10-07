@@ -16,7 +16,7 @@ import {
   type AuthUser,
   type BusinessProfile,
 } from "@/lib/auth";
-import { ROLES, businessTypeFromServer, getStoredRole, resolveRole, roleLanding, saveRole, staffAccess, type AccountRole } from "@/lib/roles";
+import { ROLES, getStoredRole, resolveRole, roleLanding, saveRole, staffAccess, type AccountRole } from "@/lib/roles";
 import { WORKSPACE_NAV, workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { WorkspaceContext } from "./WorkspaceContext";
 
@@ -24,7 +24,7 @@ type ShellState = "checking" | "ready" | "wrong-role" | "denied";
 
 function loginUrl(role: WorkspaceRole) {
   const next = encodeURIComponent(window.location.pathname);
-  return role === "staff" ? `/login?portal=staff&next=${next}` : `/login?role=${role}&next=${next}`;
+  return role === "staff" ? `/login?portal=staff&next=${next}` : `/login?next=${next}`;
 }
 
 export function WorkspaceShell({ role, children }: { role: WorkspaceRole; children: React.ReactNode }) {
@@ -89,10 +89,12 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
       // signed up as an event organizer but landed here via /bus-operator is
       // redirected to their own dashboard instead of seeing the wrong workspace.
       if (me && role !== "staff") {
-        const homeRole = resolveRole(role, me);
+        const homeRole = resolveRole(me);
+        // null = the account hasn't picked a venture yet — send it to venture
+        // selection instead of letting it into a workspace it didn't choose.
         if (homeRole !== role) {
-          saveRole(homeRole, true);
-          router.replace(roleLanding(homeRole));
+          if (homeRole) saveRole(homeRole, true);
+          router.replace(homeRole ? roleLanding(homeRole) : "/onboarding/business-type");
           return;
         }
       }

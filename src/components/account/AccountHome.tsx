@@ -62,7 +62,7 @@ export function AccountHome() {
     let cancelled = false;
     const session = getAuthSession();
     if (!session) {
-      router.replace("/login?role=customer&next=%2Faccount");
+      router.replace("/login?next=%2Faccount");
       return;
     }
 
@@ -73,7 +73,7 @@ export function AccountHome() {
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           clearAuthSession();
-          router.replace("/login?role=customer&next=%2Faccount");
+          router.replace("/login?next=%2Faccount");
           return;
         }
       }
