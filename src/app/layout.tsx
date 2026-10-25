@@ -45,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Header />
         </SiteChrome>
         <main className="flex-1">{children}</main>
-        <SiteChrome>
+        <SiteChrome hideOnHome>
           <Footer />
         </SiteChrome>
         <ServiceWorkerRegister />
