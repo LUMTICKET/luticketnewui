@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "./Logo";
 import { ModuleNav } from "./ModuleNav";
 import { CountrySwitcher } from "./CountrySwitcher";
@@ -13,6 +13,8 @@ import { workspaceHref, isWorkspaceRole } from "@/lib/workspace-nav";
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isHome = pathname === "/";
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [role, setRole] = useState<AccountRole | null>(null);
@@ -59,10 +61,21 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-2">
+          {isHome && (
+            <div className="flex items-center gap-2">
+              <LinkButton href="/login" variant="outline" size="sm">
+                Log in
+              </LinkButton>
+              <LinkButton href="/signup" variant="accent" size="sm">
+                Sign up
+              </LinkButton>
+            </div>
+          )}
+
           <Link
             href="/#module-search"
             aria-label="Search"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-navy-950 hover:bg-surface-alt"
+            className={`flex h-10 w-10 items-center justify-center rounded-full text-navy-950 hover:bg-surface-alt ${isHome ? "hidden" : ""}`}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
               <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.6" />
@@ -75,7 +88,7 @@ export function Header() {
             </svg>
           </Link>
 
-          <div className="relative" ref={menuRef}>
+          <div className={`relative ${isHome ? "hidden" : ""}`} ref={menuRef}>
             <button
               type="button"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-navy-950"
@@ -196,11 +209,13 @@ export function Header() {
         </div>
       </div>
 
-      <div className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl items-center px-2 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3">
-          <ModuleNav />
+      {!isHome && (
+        <div className="border-t border-line">
+          <div className="mx-auto flex max-w-7xl items-center px-2 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3">
+            <ModuleNav />
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
