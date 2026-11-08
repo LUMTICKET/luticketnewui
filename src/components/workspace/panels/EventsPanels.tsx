@@ -50,6 +50,16 @@ function isMobileMoneyNumber(value: string) {
   return MOBILE_MONEY.test(value) || SANDBOX_WALLETS.some((wallet) => wallet.phone === value);
 }
 
+/**
+ * While OneKhusa points at its sandbox, initiation fails for any wallet that is not one of
+ * the two test numbers above: "<phone> is not a correct test phone number". The API does not
+ * always attach a `hint` to that response, so match the detail as well.
+ */
+function isSandboxWalletRejection(error: unknown) {
+  if (!(error instanceof ApiError) || error.status !== 400) return false;
+  return /test phone number|test wallet/i.test(`${error.message} ${error.hint ?? ""}`);
+}
+
 /** The OneKhusa payment started for the listing being drafted. */
 type FeePayment = {
   id: number | string;
@@ -465,15 +475,18 @@ function CreateEventForm({
           // (for example it was already used elsewhere), so let the business pay again.
           const paymentSpent = submitError instanceof ApiError && submitError.status === 409 && Boolean(payment);
           if (paymentSpent) rememberPayment(null);
-          // The API only sends `hint` while it points at the sandbox; use it to show the test wallets.
+          // The API only sends `hint` while it points at the sandbox; either signal shows the test wallets.
           const hint = submitError instanceof ApiError ? submitError.hint?.trim() : "";
-          if (hint) setSandboxHelp(true);
+          const sandboxRejection = isSandboxWalletRejection(submitError);
+          if (hint || sandboxRejection) setSandboxHelp(true);
           // If the fee already went through, say so: pressing publish again will not charge twice.
-          const message = paymentSpent
-            ? `${base} Start a new publishing-fee payment to publish this listing.`
-            : payment
-              ? `${base} Your publishing-fee payment (#${payment.id}) is saved, so pressing the button again will not charge you twice.`
-              : base;
+          const message = sandboxRejection
+            ? `OneKhusa is in sandbox mode, which only accepts its two test wallets, so nothing was charged. Pick one below (PIN ${SANDBOX_WALLETS[0].pin}) and press the button again.`
+            : paymentSpent
+              ? `${base} Start a new publishing-fee payment to publish this listing.`
+              : payment
+                ? `${base} Your publishing-fee payment (#${payment.id}) is saved, so pressing the button again will not charge you twice.`
+                : base;
           setError(hint && !message.includes(hint) ? `${message} ${hint}` : message);
         } finally {
           setBusy(false);
@@ -667,10 +680,11 @@ function CreateEventForm({
         <Card>
           <h2 className="text-sm font-bold text-navy-950">OneKhusa sandbox wallets</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            The sandbox ignores every other wallet number. Send the prompt to one of these, approve it with PIN{" "}
-            <strong className="text-navy-950">1234</strong>, then pick the result — success, timeout, failed auth or
-            cancelled — under <span className="font-medium text-navy-950">Test Your Integration → Simulate Push Payment</span>{" "}
-            in the OneKhusa portal. Only a signed <code>pushpayment.success</code> webhook publishes the listing.
+            The sandbox ignores every other wallet number. Pick a wallet below, press the pay button again, then approve
+            the prompt with PIN <strong className="text-navy-950">1234</strong>. Choose the result — success, timeout,
+            failed auth or cancelled — under{" "}
+            <span className="font-medium text-navy-950">Test Your Integration → Simulate Push Payment</span> in the
+            OneKhusa portal. Only a signed <code>pushpayment.success</code> webhook publishes the listing.
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             {SANDBOX_WALLETS.map((wallet) => (
