@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
+  ApiError,
   createEventListing,
   getEvent,
   getPublishingFee,
@@ -34,6 +35,15 @@ function defaultCurrencyFor(_countryCode: string | undefined) {
 
 // Same rule the API applies to mobile money numbers.
 const MOBILE_MONEY = /^(\+?265|0)?[89]\d{8}$/;
+
+/** The OneKhusa payment started for the listing being drafted. */
+type FeePayment = {
+  id: number | string;
+  method: PaymentMethod;
+  status: "pending" | "succeeded";
+  /** Card payments only: OneKhusa hosted checkout page. */
+  checkoutUrl?: string;
+};
 
 export function EventsPanel({
   title,
@@ -249,12 +259,15 @@ function CreateEventForm({
 
   const [tiers, setTiers] = useState<TicketTierInput[]>([{ ...emptyTier, currency: defaultCurrency }]);
   const [method, setMethod] = useState<PaymentMethod>("tnm");
-  const [payPhone, setPayPhone] = useState("");
+  const [payPhone, setPayPhone] = useState(() => {
+    const saved = (profile.phone ?? "").replace(/\s/g, "");
+    return MOBILE_MONEY.test(saved) ? saved : "";
+  });
   const [fee, setFee] = useState<{ amount: number; currency: string } | null>(null);
   const [payNote, setPayNote] = useState("");
-  const [cardUrl, setCardUrl] = useState("");
-  // Set once the fee is paid, so a failed publish can be retried without charging again.
-  const [paidPaymentId, setPaidPaymentId] = useState<number | string | null>(null);
+  // Kept (and persisted) until the listing is published, so a slow prompt, a refresh
+  // or a failed publish reuses or re-checks the same payment instead of charging twice.
+  const [feePayment, setFeePayment] = useState<FeePayment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -274,6 +287,31 @@ function CreateEventForm({
       cancelled = true;
     };
   }, []);
+
+  const paymentKey = `lumticket.publishing-fee.${profile.id}`;
+
+  // Restore a payment started before a refresh so the business can finish
+  // publishing (or re-check its status) without paying the fee a second time.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(paymentKey);
+      const stored = raw ? (JSON.parse(raw) as FeePayment) : null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (stored?.id) setFeePayment(stored);
+    } catch {
+      // Unreadable storage: the business can simply start a new payment.
+    }
+  }, [paymentKey]);
+
+  function rememberPayment(next: FeePayment | null) {
+    setFeePayment(next);
+    try {
+      if (next) window.localStorage.setItem(paymentKey, JSON.stringify(next));
+      else window.localStorage.removeItem(paymentKey);
+    } catch {
+      // Storage is best-effort; the in-memory payment still prevents a double charge this session.
+    }
+  }
 
   function updateTier(index: number, patch: Partial<TicketTierInput>) {
     setTiers((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
@@ -309,38 +347,65 @@ function CreateEventForm({
         }
         if (!fee) return setError("The publishing fee hasn't loaded yet. Refresh the page and try again.");
         const phone = payPhone.replace(/\s/g, "");
-        if (!paidPaymentId && method !== "card" && !MOBILE_MONEY.test(phone)) {
+        if (!feePayment && method !== "card" && !MOBILE_MONEY.test(phone)) {
           return setError("Enter a valid mobile money number for the payment prompt.");
         }
 
         setBusy(true);
-        let paymentId = paidPaymentId;
+        // Reuse the payment already started for this listing instead of creating another.
+        let payment = feePayment;
 
         try {
-          if (!paymentId) {
+          if (!payment) {
             setPayNote(method === "card" ? "Opening secure card checkout…" : "Check your phone and approve the payment prompt…");
-            const payment = await startPublishingPayment(token, {
+            const started = await startPublishingPayment(token, {
               businessProfileId: profile.id,
               amount: fee.amount,
               method,
               ...(method !== "card" ? { phone } : {}),
               description: "Listing publishing fee",
             });
-            if (!payment) throw new Error("The payment could not be started.");
-            if (method === "card") {
-              if (!payment.checkoutUrl) throw new Error("Card checkout did not return a payment page.");
-              setCardUrl(payment.checkoutUrl);
+            if (!started?.id) throw new Error("The payment could not be started.");
+            payment = {
+              id: started.id,
+              method,
+              status: started.status === "succeeded" ? "succeeded" : "pending",
+              checkoutUrl: started.checkoutUrl,
+            };
+            rememberPayment(payment);
+            if (payment.method === "card" && payment.checkoutUrl && payment.status !== "succeeded") {
+              // A popup opened after an await can be blocked, so the card link is also rendered below.
               window.open(payment.checkoutUrl, "_blank", "noopener");
               setPayNote("Complete the card payment in the new tab. We'll confirm it here automatically.");
             }
-            const outcome =
-              payment.status === "succeeded" ? "succeeded" : await waitForPayment(token, profile.id, payment.id);
-            if (outcome === "failed") throw new Error("The payment was declined or cancelled. Nothing was published and you have not been charged.");
-            if (outcome === "timeout") {
-              throw new Error(`We haven't received payment confirmation yet. If money left your account, quote payment #${payment.id} to support.`);
+          }
+
+          if (payment.status !== "succeeded") {
+            setPayNote(
+              payment.method === "card"
+                ? "Waiting for the card payment to be confirmed…"
+                : "Waiting for you to approve the prompt on your phone…",
+            );
+            const outcome = await waitForPayment(token, profile.id, payment.id, {
+              // Hosted card checkout is valid for ~10 minutes, so give the payer room.
+              timeoutMs: payment.method === "card" ? 300_000 : 180_000,
+            });
+            if (outcome === "succeeded") {
+              payment = { ...payment, status: "succeeded" };
+              rememberPayment(payment);
+            } else if (outcome === "failed" || outcome === "reversed") {
+              rememberPayment(null);
+              payment = null;
+              throw new Error(
+                outcome === "reversed"
+                  ? "OneKhusa reversed this payment. Nothing was published — start a new payment to try again."
+                  : "The payment was declined or cancelled. Nothing was published and you have not been charged.",
+              );
+            } else {
+              throw new Error(
+                `OneKhusa hasn't confirmed payment #${payment.id} yet. If you approved it, press the button again to check that same payment — you will not be charged twice.`,
+              );
             }
-            paymentId = payment.id;
-            setPaidPaymentId(payment.id);
           }
           setPayNote("Payment received. Publishing your listing…");
 
@@ -351,7 +416,7 @@ function CreateEventForm({
 
           const created = await createEventListing(token, {
             businessProfileId: profile.id,
-            paymentId,
+            paymentId: payment.id,
             title: String(data.get("title") || ""),
             subtitle: String(data.get("subtitle") || ""),
             category: (categories.length === 1 ? categories[0] : data.get("category")) as Category,
@@ -368,9 +433,8 @@ function CreateEventForm({
           });
 
           setSuccess(`"${created?.title ?? "Listing"}" was published successfully.`);
-          setPaidPaymentId(null);
+          rememberPayment(null);
           setPayNote("");
-          setCardUrl("");
           setTiers([{ ...emptyTier, currency: defaultCurrency }]);
           setArrivalTerminal("");
           setDirect(true);
@@ -380,9 +444,18 @@ function CreateEventForm({
         } catch (submitError) {
           const base = submitError instanceof Error ? submitError.message : "Could not publish this listing.";
           setPayNote("");
-          setCardUrl("");
+          // A 409 from POST /api/events means this fee payment can't back another listing
+          // (for example it was already used elsewhere), so let the business pay again.
+          const paymentSpent = submitError instanceof ApiError && submitError.status === 409 && Boolean(payment);
+          if (paymentSpent) rememberPayment(null);
           // If the fee already went through, say so: pressing publish again will not charge twice.
-          setError(paymentId ? `${base} Your publishing fee is paid (payment #${paymentId}); fix the problem and press the button again. You won't be charged twice.` : base);
+          setError(
+            paymentSpent
+              ? `${base} Start a new publishing-fee payment to publish this listing.`
+              : payment
+                ? `${base} Your publishing-fee payment (#${payment.id}) is saved, so pressing the button again will not charge you twice.`
+                : base,
+          );
         } finally {
           setBusy(false);
         }
@@ -530,12 +603,32 @@ function CreateEventForm({
         <h2 className="text-sm font-bold text-navy-950">Publishing fee</h2>
         <p className="mt-1 text-sm text-ink-muted">
           {fee ? `Publishing a listing costs ${formatPrice(fee.amount, fee.currency)}, paid securely through OneKhusa.` : "Loading the publishing fee…"}
-          {paidPaymentId ? ` Fee already paid (payment #${paidPaymentId}).` : ""}
         </p>
+        {feePayment && (
+          <p className={`mt-2 text-sm font-semibold ${feePayment.status === "succeeded" ? "text-success" : "text-navy-950"}`}>
+            {feePayment.status === "succeeded" ? "Fee paid" : "Payment pending"} · payment #{feePayment.id}
+            {feePayment.status !== "succeeded" && (
+              <>
+                {" — "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    rememberPayment(null);
+                    setPayNote("");
+                    setError("");
+                  }}
+                  className="font-semibold text-ink-muted underline hover:text-navy-950"
+                >
+                  start over with another number
+                </button>
+              </>
+            )}
+          </p>
+        )}
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="method" className="text-sm font-medium text-ink">Pay with</label>
-            <select id="method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} disabled={Boolean(paidPaymentId)} className={`mt-1.5 ${inputClass} h-12`}>
+            <select id="method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} disabled={Boolean(feePayment)} className={`mt-1.5 ${inputClass} h-12`}>
               <option value="tnm">TNM Mpamba</option>
               <option value="airtel">Airtel Money</option>
               <option value="card">Bank card</option>
@@ -544,7 +637,7 @@ function CreateEventForm({
           {method !== "card" && (
             <div>
               <label htmlFor="payPhone" className="text-sm font-medium text-ink">Mobile money number</label>
-              <input id="payPhone" type="tel" inputMode="tel" autoComplete="tel" value={payPhone} onChange={(e) => setPayPhone(e.target.value)} disabled={Boolean(paidPaymentId)} placeholder="0999 000 000" className={`mt-1.5 ${inputClass} h-12`} />
+              <input id="payPhone" type="tel" inputMode="tel" autoComplete="tel" value={payPhone} onChange={(e) => setPayPhone(e.target.value)} disabled={Boolean(feePayment)} placeholder="0999 000 000" className={`mt-1.5 ${inputClass} h-12`} />
               <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number.</p>
             </div>
           )}
@@ -552,9 +645,9 @@ function CreateEventForm({
       </Card>
 
       {payNote && <p role="status" className="rounded-lg bg-surface-alt px-3 py-2 text-sm text-ink">{payNote}</p>}
-      {cardUrl && busy && (
-        <a href={cardUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold underline">
-          Card page didn&apos;t open? Click here
+      {feePayment?.checkoutUrl && feePayment.status !== "succeeded" && (
+        <a href={feePayment.checkoutUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-navy-950 underline">
+          Card page didn&apos;t open? Open the secure checkout here
         </a>
       )}
       {error && <p role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
@@ -568,7 +661,13 @@ function CreateEventForm({
       )}
 
       <Button type="submit" variant="accent" size="lg" disabled={busy} className="w-full sm:w-auto">
-        {busy ? "Processing…" : submitLabel}
+        {busy
+          ? "Processing…"
+          : feePayment
+            ? feePayment.status === "succeeded"
+              ? "Publish listing"
+              : "Check payment & publish"
+            : submitLabel}
       </Button>
     </form>
   );

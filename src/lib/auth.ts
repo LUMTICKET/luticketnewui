@@ -274,13 +274,17 @@ export function getPayment(token: string, businessProfileId: number | string, pa
   );
 }
 
-/** Polls until the webhook marks the payment succeeded/failed, or the timeout passes. */
+/**
+ * Polls until the signed OneKhusa webhook marks the payment succeeded/failed/reversed,
+ * or the timeout passes. A timeout is not a failure: the push may still be waiting on
+ * the payer, so callers must keep the payment id and check again rather than charge again.
+ */
 export async function waitForPayment(
   token: string,
   businessProfileId: number | string,
   paymentId: number | string,
   { timeoutMs = 180_000, intervalMs = 3_000 }: { timeoutMs?: number; intervalMs?: number } = {},
-): Promise<"succeeded" | "failed" | "timeout"> {
+): Promise<"succeeded" | "failed" | "reversed" | "timeout"> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -288,6 +292,7 @@ export async function waitForPayment(
       const payment = await getPayment(token, businessProfileId, paymentId);
       if (payment?.status === "succeeded") return "succeeded";
       if (payment?.status === "failed") return "failed";
+      if (payment?.status === "reversed") return "reversed";
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) throw error;
       /* transient error: keep polling */
