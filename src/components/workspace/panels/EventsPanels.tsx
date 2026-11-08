@@ -36,6 +36,20 @@ function defaultCurrencyFor(_countryCode: string | undefined) {
 // Same rule the API applies to mobile money numbers.
 const MOBILE_MONEY = /^(\+?265|0)?[89]\d{8}$/;
 
+/**
+ * OneKhusa's sandbox accepts only these two predefined payer wallets, whatever
+ * number is sent. They are 12 digits and fail the Malawian rule above, so the
+ * client accepts them explicitly — otherwise the form would block sandbox testing.
+ */
+const SANDBOX_WALLETS = [
+  { provider: "TNM Mpamba", method: "tnm" as PaymentMethod, phone: "231100000101", pin: "1234" },
+  { provider: "Airtel Money", method: "airtel" as PaymentMethod, phone: "221100000101", pin: "1234" },
+] as const;
+
+function isMobileMoneyNumber(value: string) {
+  return MOBILE_MONEY.test(value) || SANDBOX_WALLETS.some((wallet) => wallet.phone === value);
+}
+
 /** The OneKhusa payment started for the listing being drafted. */
 type FeePayment = {
   id: number | string;
@@ -261,7 +275,7 @@ function CreateEventForm({
   const [method, setMethod] = useState<PaymentMethod>("tnm");
   const [payPhone, setPayPhone] = useState(() => {
     const saved = (profile.phone ?? "").replace(/\s/g, "");
-    return MOBILE_MONEY.test(saved) ? saved : "";
+    return isMobileMoneyNumber(saved) ? saved : "";
   });
   const [fee, setFee] = useState<{ amount: number; currency: string } | null>(null);
   const [payNote, setPayNote] = useState("");
@@ -271,6 +285,8 @@ function CreateEventForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Revealed for OneKhusa sandbox wallets, or when the API returns its sandbox hint.
+  const [sandboxHelp, setSandboxHelp] = useState(false);
 
   // Bus-only route details (see formatRouteDetails above).
   const [arrivalTerminal, setArrivalTerminal] = useState("");
@@ -347,9 +363,10 @@ function CreateEventForm({
         }
         if (!fee) return setError("The publishing fee hasn't loaded yet. Refresh the page and try again.");
         const phone = payPhone.replace(/\s/g, "");
-        if (!feePayment && method !== "card" && !MOBILE_MONEY.test(phone)) {
+        if (!feePayment && method !== "card" && !isMobileMoneyNumber(phone)) {
           return setError("Enter a valid mobile money number for the payment prompt.");
         }
+        if (SANDBOX_WALLETS.some((wallet) => wallet.phone === phone)) setSandboxHelp(true);
 
         setBusy(true);
         // Reuse the payment already started for this listing instead of creating another.
@@ -448,14 +465,16 @@ function CreateEventForm({
           // (for example it was already used elsewhere), so let the business pay again.
           const paymentSpent = submitError instanceof ApiError && submitError.status === 409 && Boolean(payment);
           if (paymentSpent) rememberPayment(null);
+          // The API only sends `hint` while it points at the sandbox; use it to show the test wallets.
+          const hint = submitError instanceof ApiError ? submitError.hint?.trim() : "";
+          if (hint) setSandboxHelp(true);
           // If the fee already went through, say so: pressing publish again will not charge twice.
-          setError(
-            paymentSpent
-              ? `${base} Start a new publishing-fee payment to publish this listing.`
-              : payment
-                ? `${base} Your publishing-fee payment (#${payment.id}) is saved, so pressing the button again will not charge you twice.`
-                : base,
-          );
+          const message = paymentSpent
+            ? `${base} Start a new publishing-fee payment to publish this listing.`
+            : payment
+              ? `${base} Your publishing-fee payment (#${payment.id}) is saved, so pressing the button again will not charge you twice.`
+              : base;
+          setError(hint && !message.includes(hint) ? `${message} ${hint}` : message);
         } finally {
           setBusy(false);
         }
@@ -643,6 +662,40 @@ function CreateEventForm({
           )}
         </div>
       </Card>
+
+      {sandboxHelp && (
+        <Card>
+          <h2 className="text-sm font-bold text-navy-950">OneKhusa sandbox wallets</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            The sandbox ignores every other wallet number. Send the prompt to one of these, approve it with PIN{" "}
+            <strong className="text-navy-950">1234</strong>, then pick the result — success, timeout, failed auth or
+            cancelled — under <span className="font-medium text-navy-950">Test Your Integration → Simulate Push Payment</span>{" "}
+            in the OneKhusa portal. Only a signed <code>pushpayment.success</code> webhook publishes the listing.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            {SANDBOX_WALLETS.map((wallet) => (
+              <button
+                key={wallet.phone}
+                type="button"
+                disabled={Boolean(feePayment)}
+                onClick={() => {
+                  setMethod(wallet.method);
+                  setPayPhone(wallet.phone);
+                  rememberPayment(null);
+                  setError("");
+                  setPayNote(`Sandbox ${wallet.provider} wallet selected. Approve the prompt with PIN ${wallet.pin}.`);
+                }}
+                className="rounded-lg border border-line px-3 py-2 text-left text-xs font-semibold text-navy-950 transition-colors hover:bg-surface-alt disabled:opacity-50"
+              >
+                Use {wallet.provider}
+                <span className="mt-0.5 block font-mono font-normal text-ink-muted">
+                  {wallet.phone} · PIN {wallet.pin}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {payNote && <p role="status" className="rounded-lg bg-surface-alt px-3 py-2 text-sm text-ink">{payNote}</p>}
       {feePayment?.checkoutUrl && feePayment.status !== "succeeded" && (

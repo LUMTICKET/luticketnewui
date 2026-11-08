@@ -114,11 +114,14 @@ export function getAuthUser(): AuthUser | null {
 /** Thrown for any non-2xx API response; `status` lets callers tell an expired session (401) from other failures. */
 export class ApiError extends Error {
   status: number;
+  /** Optional follow-up from the API — e.g. OneKhusa's sandbox test-wallet guidance. */
+  hint?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, hint?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.hint = hint;
   }
 }
 
@@ -162,11 +165,11 @@ async function authorizedRequest<T>(
   if (response.status === 404) return null;
 
   const payload = (await response.json().catch(() => null)) as
-    | (T & { message?: string; error?: string })
+    | (T & { message?: string; error?: string; hint?: string })
     | null;
 
   if (!response.ok) {
-    throw new ApiError(payload?.message || payload?.error || "Request failed.", response.status);
+    throw new ApiError(payload?.message || payload?.error || "Request failed.", response.status, payload?.hint);
   }
 
   return payload as T;
