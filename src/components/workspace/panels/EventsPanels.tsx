@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/Badge";
 import {
   createEventListing,
   getEvent,
+  getPublishingFee,
   listEvents,
-  simulatePayment,
+  startPublishingPayment,
+  waitForPayment,
   type EventSummary,
+  type PaymentMethod,
   type TicketTierInput,
 } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
-import { countries } from "@/lib/data";
 import { workspaceHref } from "@/lib/workspace-nav";
 import { Card, PageHeader, inputClass } from "../ui";
 import { ProfileGate } from "../shared";
@@ -23,13 +25,15 @@ type Category = "event" | "bus" | "flight" | "tourism";
 
 const emptyTier: TicketTierInput = { name: "", price: 0, currency: "MWK", capacity: 50, perks: [] };
 
-// Supported currencies, from the country list — a dropdown instead of free
-// text, so a price can't be posted with a typo'd or unsupported code.
-const CURRENCY_OPTIONS = [...new Set(countries.map((c) => c.currency))];
+// Online payments (OneKhusa) and customer checkout only support MWK today, so tickets are priced in MWK.
+const CURRENCY_OPTIONS = ["MWK"];
 
-function defaultCurrencyFor(countryCode: string | undefined) {
-  return countries.find((c) => c.code === countryCode)?.currency ?? CURRENCY_OPTIONS[0];
+function defaultCurrencyFor(_countryCode: string | undefined) {
+  return "MWK";
 }
+
+// Same rule the API applies to mobile money numbers.
+const MOBILE_MONEY = /^(\+?265|0)?[89]\d{8}$/;
 
 export function EventsPanel({
   title,
@@ -244,7 +248,13 @@ function CreateEventForm({
   const defaultCurrency = defaultCurrencyFor(profile.country);
 
   const [tiers, setTiers] = useState<TicketTierInput[]>([{ ...emptyTier, currency: defaultCurrency }]);
-  const [method, setMethod] = useState<"card" | "tnm" | "airtel">("tnm");
+  const [method, setMethod] = useState<PaymentMethod>("tnm");
+  const [payPhone, setPayPhone] = useState("");
+  const [fee, setFee] = useState<{ amount: number; currency: string } | null>(null);
+  const [payNote, setPayNote] = useState("");
+  const [cardUrl, setCardUrl] = useState("");
+  // Set once the fee is paid, so a failed publish can be retried without charging again.
+  const [paidPaymentId, setPaidPaymentId] = useState<number | string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -254,6 +264,16 @@ function CreateEventForm({
   const [direct, setDirect] = useState(true);
   const [stops, setStops] = useState<RouteStop[]>([{ name: "", eta: "" }]);
   const [estimatedArrival, setEstimatedArrival] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublishingFee()
+      .then((f) => !cancelled && setFee(f))
+      .catch(() => !cancelled && setError("Couldn't load the publishing fee. Refresh the page to try again."));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateTier(index: number, patch: Partial<TicketTierInput>) {
     setTiers((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
@@ -270,17 +290,59 @@ function CreateEventForm({
         const form = event.currentTarget;
         setError("");
         setSuccess("");
+        setPayNote("");
+        const data = new FormData(form);
+
+        // Validate everything BEFORE charging anyone.
+        const startsAt = new Date(String(data.get("startsAt") || ""));
+        if (Number.isNaN(startsAt.getTime())) return setError("Choose a valid start date and time.");
+        if (startsAt.getTime() <= Date.now()) return setError("The start time must be in the future, otherwise customers won't see the listing.");
+        const cleanTiers = tiers
+          .filter((t) => t.name.trim())
+          .map((t) => ({ ...t, name: t.name.trim(), price: Number(t.price), capacity: Number(t.capacity), currency: "MWK" }));
+        if (!cleanTiers.length) return setError(isBus ? "Add at least one seat class with a name." : "Add at least one ticket type with a name.");
+        if (cleanTiers.some((t) => !Number.isInteger(t.price) || t.price <= 0)) {
+          return setError("Prices must be whole MWK amounts above 0. Free tickets can't be sold online yet.");
+        }
+        if (cleanTiers.some((t) => !Number.isInteger(t.capacity) || t.capacity <= 0)) {
+          return setError("Capacity must be a whole number above 0.");
+        }
+        if (!fee) return setError("The publishing fee hasn't loaded yet. Refresh the page and try again.");
+        const phone = payPhone.replace(/\s/g, "");
+        if (!paidPaymentId && method !== "card" && !MOBILE_MONEY.test(phone)) {
+          return setError("Enter a valid mobile money number for the payment prompt.");
+        }
+
         setBusy(true);
+        let paymentId = paidPaymentId;
 
         try {
-          const data = new FormData(form);
-          const payment = await simulatePayment(token, {
-            businessProfileId: profile.id,
-            amount: Number(data.get("feeAmount") || 0),
-            currency: String(data.get("feeCurrency") || defaultCurrency),
-            method,
-          });
-          if (!payment) throw new Error("Payment simulation did not return a record.");
+          if (!paymentId) {
+            setPayNote(method === "card" ? "Opening secure card checkout…" : "Check your phone and approve the payment prompt…");
+            const payment = await startPublishingPayment(token, {
+              businessProfileId: profile.id,
+              amount: fee.amount,
+              method,
+              ...(method !== "card" ? { phone } : {}),
+              description: "Listing publishing fee",
+            });
+            if (!payment) throw new Error("The payment could not be started.");
+            if (method === "card") {
+              if (!payment.checkoutUrl) throw new Error("Card checkout did not return a payment page.");
+              setCardUrl(payment.checkoutUrl);
+              window.open(payment.checkoutUrl, "_blank", "noopener");
+              setPayNote("Complete the card payment in the new tab. We'll confirm it here automatically.");
+            }
+            const outcome =
+              payment.status === "succeeded" ? "succeeded" : await waitForPayment(token, profile.id, payment.id);
+            if (outcome === "failed") throw new Error("The payment was declined or cancelled. Nothing was published and you have not been charged.");
+            if (outcome === "timeout") {
+              throw new Error(`We haven't received payment confirmation yet. If money left your account, quote payment #${payment.id} to support.`);
+            }
+            paymentId = payment.id;
+            setPaidPaymentId(payment.id);
+          }
+          setPayNote("Payment received. Publishing your listing…");
 
           const userNotes = String(data.get("description") || "");
           const finalDescription = isBus
@@ -289,25 +351,26 @@ function CreateEventForm({
 
           const created = await createEventListing(token, {
             businessProfileId: profile.id,
-            paymentId: payment.id,
+            paymentId,
             title: String(data.get("title") || ""),
             subtitle: String(data.get("subtitle") || ""),
             category: (categories.length === 1 ? categories[0] : data.get("category")) as Category,
             organizer: profile.businessName,
             description: finalDescription,
             location: String(data.get("location") || ""),
-            startsAt: new Date(String(data.get("startsAt") || "")).toISOString(),
+            startsAt: startsAt.toISOString(),
             maxPerUser: Number(data.get("maxPerUser") || 5),
             tags: String(data.get("tags") || "")
               .split(",")
               .map((t) => t.trim())
               .filter(Boolean),
-            tickets: tiers
-              .filter((t) => t.name)
-              .map((t) => ({ ...t, price: Number(t.price), capacity: Number(t.capacity) })),
+            tickets: cleanTiers,
           });
 
           setSuccess(`"${created?.title ?? "Listing"}" was published successfully.`);
+          setPaidPaymentId(null);
+          setPayNote("");
+          setCardUrl("");
           setTiers([{ ...emptyTier, currency: defaultCurrency }]);
           setArrivalTerminal("");
           setDirect(true);
@@ -315,7 +378,11 @@ function CreateEventForm({
           setEstimatedArrival("");
           form.reset();
         } catch (submitError) {
-          setError(submitError instanceof Error ? submitError.message : "Could not publish this listing.");
+          const base = submitError instanceof Error ? submitError.message : "Could not publish this listing.";
+          setPayNote("");
+          setCardUrl("");
+          // If the fee already went through, say so: pressing publish again will not charge twice.
+          setError(paymentId ? `${base} Your publishing fee is paid (payment #${paymentId}); fix the problem and press the button again. You won't be charged twice.` : base);
         } finally {
           setBusy(false);
         }
@@ -460,31 +527,36 @@ function CreateEventForm({
       </Card>
 
       <Card>
-        <h2 className="text-sm font-bold text-navy-950">Publishing fee (simulated payment)</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <h2 className="text-sm font-bold text-navy-950">Publishing fee</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          {fee ? `Publishing a listing costs ${formatPrice(fee.amount, fee.currency)}, paid securely through OneKhusa.` : "Loading the publishing fee…"}
+          {paidPaymentId ? ` Fee already paid (payment #${paidPaymentId}).` : ""}
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="feeAmount" className="text-sm font-medium text-ink">Amount</label>
-            <input id="feeAmount" name="feeAmount" type="number" min={0} required defaultValue={10000} className={`mt-1.5 ${inputClass} h-12`} />
-          </div>
-          <div>
-            <label htmlFor="feeCurrency" className="text-sm font-medium text-ink">Currency</label>
-            <select id="feeCurrency" name="feeCurrency" defaultValue={defaultCurrency} className={`mt-1.5 ${inputClass} h-12`}>
-              {CURRENCY_OPTIONS.map((currency) => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="method" className="text-sm font-medium text-ink">Method</label>
-            <select id="method" value={method} onChange={(e) => setMethod(e.target.value as "card" | "tnm" | "airtel")} className={`mt-1.5 ${inputClass} h-12`}>
+            <label htmlFor="method" className="text-sm font-medium text-ink">Pay with</label>
+            <select id="method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} disabled={Boolean(paidPaymentId)} className={`mt-1.5 ${inputClass} h-12`}>
               <option value="tnm">TNM Mpamba</option>
               <option value="airtel">Airtel Money</option>
-              <option value="card">Card</option>
+              <option value="card">Bank card</option>
             </select>
           </div>
+          {method !== "card" && (
+            <div>
+              <label htmlFor="payPhone" className="text-sm font-medium text-ink">Mobile money number</label>
+              <input id="payPhone" type="tel" inputMode="tel" autoComplete="tel" value={payPhone} onChange={(e) => setPayPhone(e.target.value)} disabled={Boolean(paidPaymentId)} placeholder="0999 000 000" className={`mt-1.5 ${inputClass} h-12`} />
+              <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number.</p>
+            </div>
+          )}
         </div>
       </Card>
 
+      {payNote && <p role="status" className="rounded-lg bg-surface-alt px-3 py-2 text-sm text-ink">{payNote}</p>}
+      {cardUrl && busy && (
+        <a href={cardUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold underline">
+          Card page didn&apos;t open? Click here
+        </a>
+      )}
       {error && <p role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
       {success && (
         <p role="status" className="rounded-lg bg-success-surface px-3 py-2 text-sm text-success">
@@ -496,7 +568,7 @@ function CreateEventForm({
       )}
 
       <Button type="submit" variant="accent" size="lg" disabled={busy} className="w-full sm:w-auto">
-        {busy ? "Publishing…" : submitLabel}
+        {busy ? "Processing…" : submitLabel}
       </Button>
     </form>
   );

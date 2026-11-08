@@ -65,7 +65,7 @@ const SESSION_KEY = "lumticket.auth";
 const USER_KEY = "lumticket.user";
 
 export function getApiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL || "https://api-gamma-mocha-qn31xem8po.vercel.app").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_API_URL || "https://api.lumticket.com").replace(/\/$/, "");
 }
 
 export function getAuthSession(): AuthSession | null {
@@ -233,27 +233,72 @@ export interface PaymentRecord {
   currency?: string;
   status?: string;
   paidAt?: string;
+  /** Card payments only: OneKhusa hosted checkout page (valid ~10 minutes). */
+  checkoutUrl?: string;
   [key: string]: unknown;
 }
 
-export function simulatePayment(
+export type PaymentMethod = "card" | "tnm" | "airtel";
+
+/** Fee charged to publish one listing; the API enforces it when the listing is created. */
+export async function getPublishingFee() {
+  const result = await publicApiRequest<{ amount: number; currency: string }>("/api/payments/publishing-fee");
+  return result;
+}
+
+/**
+ * Starts a real OneKhusa payment. tnm/airtel send a PIN prompt to `phone`;
+ * card returns a `checkoutUrl`. The payment only becomes "succeeded" when OneKhusa's signed
+ * webhook reaches the API, so poll with waitForPayment().
+ */
+export function startPublishingPayment(
   token: string,
   payload: {
     businessProfileId: number | string;
     amount: number;
-    currency: string;
-    method: "card" | "tnm" | "airtel";
+    method: PaymentMethod;
+    phone?: string;
+    description?: string;
   },
 ) {
-  return authorizedRequest<PaymentRecord>("/api/payments/simulate", token, {
+  return authorizedRequest<PaymentRecord>("/api/payments/onekhusa", token, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, currency: "MWK" }),
   });
+}
+
+export function getPayment(token: string, businessProfileId: number | string, paymentId: number | string) {
+  return authorizedRequest<PaymentRecord>(
+    `/api/payments/onekhusa?businessProfileId=${businessProfileId}&paymentId=${paymentId}`,
+    token,
+  );
+}
+
+/** Polls until the webhook marks the payment succeeded/failed, or the timeout passes. */
+export async function waitForPayment(
+  token: string,
+  businessProfileId: number | string,
+  paymentId: number | string,
+  { timeoutMs = 180_000, intervalMs = 3_000 }: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<"succeeded" | "failed" | "timeout"> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    try {
+      const payment = await getPayment(token, businessProfileId, paymentId);
+      if (payment?.status === "succeeded") return "succeeded";
+      if (payment?.status === "failed") return "failed";
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) throw error;
+      /* transient error: keep polling */
+    }
+  }
+  return "timeout";
 }
 
 export async function listPayments(token: string, businessProfileId: number | string) {
   const result = await authorizedRequest<PaymentRecord[]>(
-    `/api/payments/simulate?businessProfileId=${businessProfileId}`,
+    `/api/payments/onekhusa?businessProfileId=${businessProfileId}`,
     token,
   );
   return result ?? [];
