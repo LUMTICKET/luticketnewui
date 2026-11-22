@@ -1,19 +1,18 @@
 "use client";
 
 import type { PaymentMethod } from "@/lib/checkout";
-import { SANDBOX_WALLETS } from "@/lib/checkout";
 
 const OPTIONS: { value: PaymentMethod; label: string; note: string }[] = [
   { value: "tnm", label: "TNM Mpamba", note: "PIN prompt on your phone" },
   { value: "airtel", label: "Airtel Money", note: "PIN prompt on your phone" },
-  { value: "card", label: "Bank card", note: "Secure card page" },
+  { value: "card", label: "Bank card", note: "Secure PayChangu page" },
 ];
 
 /**
  * The one payment screen shared by ticket buyers and business owners paying the publishing fee:
  * pick TNM Mpamba, Airtel Money or card, and enter a mobile money number for the PIN prompt.
- * When the API reports `hosted`, mobile money can't be charged directly, so the provider's own
- * secure page handles everything and there is nothing to choose here.
+ * Payments are processed by PayChangu. When the API reports `hosted`, mobile money can't be charged
+ * directly, so PayChangu's own secure page handles everything and there is nothing to choose here.
  */
 export function PaymentChoice({
   idPrefix,
@@ -23,7 +22,6 @@ export function PaymentChoice({
   onPhoneChange,
   hosted = false,
   disabled = false,
-  sandboxHelp = false,
 }: {
   idPrefix: string;
   method: PaymentMethod;
@@ -32,13 +30,11 @@ export function PaymentChoice({
   onPhoneChange: (phone: string) => void;
   hosted?: boolean;
   disabled?: boolean;
-  /** Show the sandbox test wallets (OneKhusa test mode only accepts these). */
-  sandboxHelp?: boolean;
 }) {
   if (hosted) {
     return (
       <p className="text-sm text-ink-muted">
-        You&apos;ll continue to a secure payment page where you can pay with TNM Mpamba, Airtel Money or a bank card.
+        You&apos;ll continue to PayChangu&apos;s secure payment page where you can pay with TNM Mpamba, Airtel Money or a bank card.
       </p>
     );
   }
@@ -86,33 +82,9 @@ export function PaymentChoice({
           <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number. Use the number registered for {method === "tnm" ? "TNM Mpamba" : "Airtel Money"}.</p>
         </div>
       ) : (
-        <p className="mt-4 text-sm text-ink-muted">You&apos;ll enter your card details on a secure page that opens in a new tab.</p>
+        <p className="mt-4 text-sm text-ink-muted">You&apos;ll enter your card details on PayChangu&apos;s secure page, which opens in a new tab.</p>
       )}
 
-      {sandboxHelp && (
-        <div className="mt-4 rounded-xl bg-surface-alt p-3 text-xs text-ink-muted">
-          <p>
-            Test mode accepts only these wallets (PIN <strong className="text-navy-950">1234</strong>):
-          </p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            {SANDBOX_WALLETS.map((w) => (
-              <button
-                key={w.phone}
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  onMethodChange(w.method);
-                  onPhoneChange(w.phone);
-                }}
-                className="rounded-lg border border-line bg-white px-3 py-2 text-left font-semibold text-navy-950 disabled:opacity-50"
-              >
-                Use {w.provider}
-                <span className="mt-0.5 block font-mono font-normal text-ink-muted">{w.phone}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

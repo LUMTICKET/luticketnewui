@@ -114,7 +114,7 @@ export function getAuthUser(): AuthUser | null {
 /** Thrown for any non-2xx API response; `status` lets callers tell an expired session (401) from other failures. */
 export class ApiError extends Error {
   status: number;
-  /** Optional follow-up from the API — e.g. OneKhusa's sandbox test-wallet guidance. */
+  /** Optional follow-up from the API. */
   hint?: string;
 
   constructor(message: string, status: number, hint?: string) {
@@ -236,7 +236,7 @@ export interface PaymentRecord {
   currency?: string;
   status?: string;
   paidAt?: string;
-  /** Card payments only: OneKhusa hosted checkout page (valid ~10 minutes). */
+  /** Set when the payer finishes on PayChangu's secure page (card, or hosted mobile money). */
   checkoutUrl?: string;
   [key: string]: unknown;
 }
@@ -250,21 +250,21 @@ export async function getPublishingFee() {
 }
 
 /**
- * Starts a real OneKhusa payment. tnm/airtel send a PIN prompt to `phone`;
- * card returns a `checkoutUrl`. The payment only becomes "succeeded" when OneKhusa's signed
- * webhook reaches the API, so poll with waitForPayment().
+ * Starts a real PayChangu payment. tnm/airtel send a PIN prompt to `phone`;
+ * card (or hosted mode) returns a `checkoutUrl`. The payment only becomes "succeeded" once the API has
+ * verified it with PayChangu, so poll with waitForPayment(). The API always charges the server-side fee.
  */
 export function startPublishingPayment(
   token: string,
   payload: {
     businessProfileId: number | string;
-    amount: number;
+    amount?: number;
     method: PaymentMethod;
     phone?: string;
     description?: string;
   },
 ) {
-  return authorizedRequest<PaymentRecord>("/api/payments/onekhusa", token, {
+  return authorizedRequest<PaymentRecord>("/api/payments/paychangu", token, {
     method: "POST",
     body: JSON.stringify({ ...payload, currency: "MWK" }),
   });
@@ -272,13 +272,13 @@ export function startPublishingPayment(
 
 export function getPayment(token: string, businessProfileId: number | string, paymentId: number | string) {
   return authorizedRequest<PaymentRecord>(
-    `/api/payments/onekhusa?businessProfileId=${businessProfileId}&paymentId=${paymentId}`,
+    `/api/payments/paychangu?businessProfileId=${businessProfileId}&paymentId=${paymentId}`,
     token,
   );
 }
 
 /**
- * Polls until the signed OneKhusa webhook marks the payment succeeded/failed/reversed,
+ * Polls until PayChangu has confirmed the payment as succeeded/failed,
  * or the timeout passes. A timeout is not a failure: the push may still be waiting on
  * the payer, so callers must keep the payment id and check again rather than charge again.
  */
@@ -306,7 +306,7 @@ export async function waitForPayment(
 
 export async function listPayments(token: string, businessProfileId: number | string) {
   const result = await authorizedRequest<PaymentRecord[]>(
-    `/api/payments/onekhusa?businessProfileId=${businessProfileId}`,
+    `/api/payments/paychangu?businessProfileId=${businessProfileId}`,
     token,
   );
   return result ?? [];

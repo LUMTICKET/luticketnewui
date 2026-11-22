@@ -1,10 +1,10 @@
-// Customer ticket checkout against the Lumticket API (OneKhusa behind it).
+// Customer ticket checkout against the Lumticket API (PayChangu behind it).
 //
 //   POST /api/checkout/tickets        { ticketTypeId, quantity, method, phone? } -> pending payment
 //   GET  /api/checkout/tickets/:id    -> { status, booking? | problem? }
 //
-// The server prices the order and issues the booking only after OneKhusa's signed
-// webhook confirms payment, so a 201 or a card redirect is never proof of payment.
+// The server prices the order and issues the booking only after it has verified the payment
+// with PayChangu, so a 201 or a redirect is never proof of payment.
 import { apiRequest, ApiError, publicApiRequest, type PaymentMethod } from "@/lib/auth";
 import type { ApiBooking } from "@/lib/operations";
 
@@ -15,20 +15,17 @@ export interface TicketCheckoutStarted {
   status: "pending";
   amount: number;
   currency: string;
-  /** Mobile money: amount the payer will actually be asked to approve (incl. charges). */
-  amountToPay?: number;
-  totalCharges?: number;
-  /** Card only: OneKhusa hosted checkout page (valid ~10 minutes). */
+  /** Set when the payer finishes on PayChangu's secure page (card, or hosted mobile money). */
   checkoutUrl?: string;
 }
 
 export interface CheckoutConfig {
-  provider: "onekhusa" | "paychangu";
-  /** Hosted checkout: the customer picks mobile money or card on the provider's page. */
+  provider: "paychangu";
+  /** Hosted checkout: the customer picks mobile money or card on PayChangu's page. */
   hosted: boolean;
 }
 
-/** How this deployment collects payment. Falls back to the mobile-money form if the API is older. */
+/** How this deployment collects payment. If the config can't be read, offer the hosted page, which always works. */
 export async function getCheckoutConfig(): Promise<CheckoutConfig> {
   try {
     const result = await publicApiRequest<CheckoutConfig>("/api/checkout/config");
@@ -36,7 +33,7 @@ export async function getCheckoutConfig(): Promise<CheckoutConfig> {
   } catch {
     /* older API without the config route */
   }
-  return { provider: "onekhusa", hosted: false };
+  return { provider: "paychangu", hosted: true };
 }
 
 export function startTicketCheckout(payload: {
@@ -92,15 +89,8 @@ export async function waitForTicketPayment(
   return { status: "timeout" };
 }
 
-/** OneKhusa's sandbox accepts only these payer wallets (PIN 1234). Live mode has no such limit. */
-export const SANDBOX_WALLETS = [
-  { provider: "TNM Mpamba", method: "tnm" as const, phone: "231100000101" },
-  { provider: "Airtel Money", method: "airtel" as const, phone: "221100000101" },
-] as const;
-
 const MALAWI_MOBILE = /^(?:\+?265|0)?[89]\d{8}$/;
 
 export function isValidMobileMoneyNumber(value: string) {
-  const compact = value.replace(/[\s-]/g, "");
-  return MALAWI_MOBILE.test(compact) || SANDBOX_WALLETS.some((w) => w.phone === compact);
+  return MALAWI_MOBILE.test(value.replace(/[\s-]/g, ""));
 }

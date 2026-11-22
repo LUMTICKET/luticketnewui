@@ -35,10 +35,9 @@ export function TicketSelector({ event }: { event: EventListing }) {
   const [started, setStarted] = useState<TicketCheckoutStarted | null>(null);
   const [booking, setBooking] = useState<ApiBooking | null>(null);
   const [error, setError] = useState("");
-  const [sandboxHelp, setSandboxHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
-  // Hosted checkout (PayChangu): no method or phone here, the customer pays on the provider's page.
+  // Hosted checkout: no method or phone here, the customer pays on PayChangu's page.
   const [hosted, setHosted] = useState(false);
   const mounted = useRef(true);
 
@@ -72,8 +71,6 @@ export function TicketSelector({ event }: { event: EventListing }) {
   function describeError(err: unknown) {
     const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
     const hint = err instanceof ApiError ? err.hint?.trim() : "";
-    const sandboxRejection = err instanceof ApiError && /test phone number|test wallet/i.test(`${message} ${hint}`);
-    if (hint || sandboxRejection) setSandboxHelp(true);
     return hint && !message.includes(hint) ? `${message} ${hint}` : message;
   }
 
@@ -170,9 +167,7 @@ export function TicketSelector({ event }: { event: EventListing }) {
         <p className="mt-2 text-sm text-ink-muted">
           {started?.checkoutUrl
             ? "Finish paying in the secure checkout tab we opened. This page updates by itself."
-            : `We sent a PIN prompt to ${phone}. Enter your PIN to pay${
-                started?.amountToPay ? ` ${formatPrice(started.amountToPay, event.currency)} (includes charges)` : ""
-              }.`}
+            : `We sent a PIN prompt to ${phone}. Enter your PIN to pay ${formatPrice(started?.amount ?? total, event.currency)}.`}
         </p>
         {started?.checkoutUrl && (
           <a href={started.checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-navy-950 underline">
@@ -260,7 +255,6 @@ export function TicketSelector({ event }: { event: EventListing }) {
             phone={phone}
             onPhoneChange={(v) => { setPhone(v); setError(""); }}
             hosted={hosted}
-            sandboxHelp={sandboxHelp}
           />
         </div>
 
