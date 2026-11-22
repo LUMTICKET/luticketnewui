@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+
+  /*
+   * Brand palette — sampled directly from the Lumina Holdings logo
+   * (public/brand/lumina-logo-source.png). Navy #042045 and gold #CC9F2F are
+   * the two logo inks; every other step is a ramp around them.
+   * `npm run brand` prints the sampled values if the logo ever changes.
+   */
+
+  /* Navy — primary brand ramp, 950 = logo navy */
+  --color-navy-50: #eff4fb;
+  --color-navy-100: #dde7f5;
+  --color-navy-200: #b7cbe8;
+  --color-navy-300: #8aabd6;
+  --color-navy-400: #5a83bc;
+  --color-navy-500: #37629b;
+  --color-navy-600: #244c80;
+  --color-navy-700: #17396a;
+  --color-navy-800: #0c2c56;
+  --color-navy-900: #072550;
+  --color-navy-950: #042045;
+
+  /* Gold — accent ramp, 500 = logo gold. 600+ is dark enough for text on white (AA). */
+  --color-gold-50: #fcf7e8;
+  --color-gold-100: #f8edcb;
+  --color-gold-200: #f0da9c;
+  --color-gold-300: #e6c56b;
+  --color-gold-400: #d9b045;
+  --color-gold-500: #cc9f2f;
+  --color-gold-600: #936e10;
+  --color-gold-700: #735609;
+  --color-gold-800: #543f07;
+  --color-gold-900: #3a2c05;
+
+  /* Neutrals for surfaces + text on a light canvas */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f7f5f0;
+  --color-surface-sunken: #f0eee8;
+  --color-line: #e4e1d8;
+
+  --color-ink: #0a1c38;
+  --color-ink-muted: #55627a;
+  --color-ink-faint: #8792a6;
+
+  --color-success: #1e8e5a;
+  --color-success-surface: #e9f6ef;
+  --color-error: #b3232f;
+  --color-error-surface: #fbeaec;
+  --color-warning: #936e10;
+  --color-warning-surface: #fbf1d6;
+}
+
+:root {
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-geist-sans);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold-500);
+  outline-offset: 2px;
+}

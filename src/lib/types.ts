@@ -1,0 +1,60 @@
+export type ServiceKind = "bus" | "events" | "parcel";
+
+export interface Country {
+  code: string;
+  name: string;
+  currency: string;
+  flag: string;
+  live: boolean;
+}
+
+export interface BusRoute {
+  id: string;
+  origin: string;
+  destination: string;
+  operator: string;
+  duration: string;
+  fromPrice: number;
+  currency: string;
+  departures: number;
+  rating: number;
+}
+
+export interface EventTicketType {
+  /** Present for live API tickets; sample events have none and cannot be bought. */
+  id?: number | string;
+  name: string;
+  price: number;
+  perks: string[];
+  remaining: number;
+}
+
+export interface EventListing {
+  id: string;
+  title: string;
+  category: string;
+  venue: string;
+  city: string;
+  countryCode: string;
+  date: string;
+  fromPrice: number;
+  currency: string;
+  status: "on-sale" | "selling-fast" | "sold-out";
+  description?: string;
+  ticketTypes?: EventTicketType[];
+  maxPerUser?: number;
+  /** True when the event came from the live catalog and can take real payments. */
+  purchasable?: boolean;
+}
+
+export interface CustomerBooking {
+  id: string;
+  kind: "bus" | "event" | "parcel";
+  title: string;
+  detail: string;
+  reference: string;
+  date: string;
+  amount: number;
+  currency: string;
+  status: "upcoming" | "completed" | "in-transit" | "delivered" | "cancelled";
+}
