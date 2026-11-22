@@ -10,18 +10,18 @@ import { formatPrice } from "@/lib/format";
 import { ApiError, getAuthSession } from "@/lib/auth";
 import type { ApiBooking } from "@/lib/operations";
 import {
+  getCheckoutConfig,
   isValidMobileMoneyNumber,
-  SANDBOX_WALLETS,
   startTicketCheckout,
   waitForTicketPayment,
   type PaymentMethod,
   type TicketCheckoutStarted,
 } from "@/lib/checkout";
 import { AccountNudge } from "@/components/checkout/GuestDetailsStep";
+import { PaymentChoice } from "@/components/checkout/PaymentChoice";
 
 type Step = "select" | "pay" | "waiting" | "confirmed" | "failed" | "soldOut" | "timeout";
 
-const inputClass = "w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400";
 
 export function TicketSelector({ event }: { event: EventListing }) {
   const ticketTypes = useMemo(() => event.ticketTypes ?? [], [event.ticketTypes]);
@@ -38,12 +38,15 @@ export function TicketSelector({ event }: { event: EventListing }) {
   const [sandboxHelp, setSandboxHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  // Hosted checkout (PayChangu): no method or phone here, the customer pays on the provider's page.
+  const [hosted, setHosted] = useState(false);
   const mounted = useRef(true);
 
   // Session lives in browser storage, so read it after mount to keep server/client markup identical.
   useEffect(() => {
     mounted.current = true;
     setLoggedIn(Boolean(getAuthSession()));
+    void getCheckoutConfig().then((c) => mounted.current && setHosted(c.hosted));
     return () => {
       mounted.current = false;
     };
@@ -100,7 +103,7 @@ export function TicketSelector({ event }: { event: EventListing }) {
     e.preventDefault();
     if (!selected || selected.id === undefined) return;
     setError("");
-    if (method !== "card" && !isValidMobileMoneyNumber(phone)) {
+    if (!hosted && method !== "card" && !isValidMobileMoneyNumber(phone)) {
       setError("Enter a valid TNM or Airtel mobile money number, e.g. 0999 123 456.");
       return;
     }
@@ -109,11 +112,10 @@ export function TicketSelector({ event }: { event: EventListing }) {
       const result = await startTicketCheckout({
         ticketTypeId: selected.id,
         quantity,
-        method,
-        phone: method === "card" ? undefined : phone.replace(/[\s-]/g, ""),
+        ...(hosted ? {} : { method, phone: method === "card" ? undefined : phone.replace(/[\s-]/g, "") }),
       });
       setStarted(result);
-      if (method === "card" && result.checkoutUrl) window.open(result.checkoutUrl, "_blank", "noopener");
+      if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank", "noopener");
       void settle(result.paymentId);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -163,16 +165,16 @@ export function TicketSelector({ event }: { event: EventListing }) {
       <div className="rounded-2xl border border-line p-8 text-center" role="status" aria-live="polite">
         <Badge tone="warning">Waiting for payment</Badge>
         <h2 className="mt-4 text-lg font-bold text-navy-950">
-          {method === "card" ? "Complete your card payment" : "Approve the payment on your phone"}
+          {started?.checkoutUrl ? "Complete your payment" : "Approve the payment on your phone"}
         </h2>
         <p className="mt-2 text-sm text-ink-muted">
-          {method === "card"
+          {started?.checkoutUrl
             ? "Finish paying in the secure checkout tab we opened. This page updates by itself."
             : `We sent a PIN prompt to ${phone}. Enter your PIN to pay${
                 started?.amountToPay ? ` ${formatPrice(started.amountToPay, event.currency)} (includes charges)` : ""
               }.`}
         </p>
-        {method === "card" && started?.checkoutUrl && (
+        {started?.checkoutUrl && (
           <a href={started.checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-navy-950 underline">
             Checkout didn&apos;t open? Open it here
           </a>
@@ -251,55 +253,21 @@ export function TicketSelector({ event }: { event: EventListing }) {
         </p>
 
         <div className="mt-5">
-          <label htmlFor="pay-method" className="text-sm font-medium text-ink">Pay with</label>
-          <select id="pay-method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className={`mt-1.5 h-12 ${inputClass}`}>
-            <option value="tnm">TNM Mpamba</option>
-            <option value="airtel">Airtel Money</option>
-            <option value="card">Bank card</option>
-          </select>
+          <PaymentChoice
+            idPrefix="ticket"
+            method={method}
+            onMethodChange={(m) => { setMethod(m); setError(""); }}
+            phone={phone}
+            onPhoneChange={(v) => { setPhone(v); setError(""); }}
+            hosted={hosted}
+            sandboxHelp={sandboxHelp}
+          />
         </div>
-
-        {method !== "card" && (
-          <div className="mt-4">
-            <label htmlFor="pay-phone" className="text-sm font-medium text-ink">Mobile money number</label>
-            <input
-              id="pay-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0999 123 456"
-              className={`mt-1.5 h-12 ${inputClass}`}
-            />
-            <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number.</p>
-          </div>
-        )}
-
-        {sandboxHelp && (
-          <div className="mt-4 rounded-xl bg-surface-alt p-3 text-xs text-ink-muted">
-            <p>Test mode accepts only these wallets (PIN <strong className="text-navy-950">1234</strong>):</p>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              {SANDBOX_WALLETS.map((w) => (
-                <button
-                  key={w.phone}
-                  type="button"
-                  onClick={() => { setMethod(w.method); setPhone(w.phone); setError(""); }}
-                  className="rounded-lg border border-line bg-white px-3 py-2 text-left font-semibold text-navy-950"
-                >
-                  Use {w.provider}
-                  <span className="mt-0.5 block font-mono font-normal text-ink-muted">{w.phone}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {error && <p role="alert" className="mt-4 rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
 
         <Button type="submit" variant="accent" size="lg" className="mt-6 w-full" disabled={busy}>
-          {busy ? "Starting payment…" : `Pay ${formatPrice(total, event.currency)}`}
+          {busy ? "Starting payment…" : hosted || method === "card" ? `Continue to secure payment · ${formatPrice(total, event.currency)}` : `Pay ${formatPrice(total, event.currency)}`}
         </Button>
       </form>
     );

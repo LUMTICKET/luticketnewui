@@ -5,7 +5,7 @@
 //
 // The server prices the order and issues the booking only after OneKhusa's signed
 // webhook confirms payment, so a 201 or a card redirect is never proof of payment.
-import { apiRequest, ApiError, type PaymentMethod } from "@/lib/auth";
+import { apiRequest, ApiError, publicApiRequest, type PaymentMethod } from "@/lib/auth";
 import type { ApiBooking } from "@/lib/operations";
 
 export type { PaymentMethod };
@@ -22,10 +22,27 @@ export interface TicketCheckoutStarted {
   checkoutUrl?: string;
 }
 
+export interface CheckoutConfig {
+  provider: "onekhusa" | "paychangu";
+  /** Hosted checkout: the customer picks mobile money or card on the provider's page. */
+  hosted: boolean;
+}
+
+/** How this deployment collects payment. Falls back to the mobile-money form if the API is older. */
+export async function getCheckoutConfig(): Promise<CheckoutConfig> {
+  try {
+    const result = await publicApiRequest<CheckoutConfig>("/api/checkout/config");
+    if (result && typeof result.hosted === "boolean") return result;
+  } catch {
+    /* older API without the config route */
+  }
+  return { provider: "onekhusa", hosted: false };
+}
+
 export function startTicketCheckout(payload: {
   ticketTypeId: number | string;
   quantity: number;
-  method: PaymentMethod;
+  method?: PaymentMethod;
   phone?: string;
 }) {
   return apiRequest<TicketCheckoutStarted>("/api/checkout/tickets", {

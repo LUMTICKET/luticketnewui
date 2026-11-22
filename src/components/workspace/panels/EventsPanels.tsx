@@ -1,5 +1,7 @@
 "use client";
 
+import { getCheckoutConfig } from "@/lib/checkout";
+import { PaymentChoice } from "@/components/checkout/PaymentChoice";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Button, LinkButton } from "@/components/ui/Button";
@@ -297,6 +299,9 @@ function CreateEventForm({
   const [success, setSuccess] = useState("");
   // Revealed for OneKhusa sandbox wallets, or when the API returns its sandbox hint.
   const [sandboxHelp, setSandboxHelp] = useState(false);
+  // Hosted checkout (PayChangu): the payer chooses mobile money or card on the provider's page,
+  // so the form skips the method/number fields and uses the existing hosted ("card") flow.
+  const [hosted, setHosted] = useState(false);
 
   // Bus-only route details (see formatRouteDetails above).
   const [arrivalTerminal, setArrivalTerminal] = useState("");
@@ -309,6 +314,18 @@ function CreateEventForm({
     getPublishingFee()
       .then((f) => !cancelled && setFee(f))
       .catch(() => !cancelled && setError("Couldn't load the publishing fee. Refresh the page to try again."));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCheckoutConfig().then((c) => {
+      if (cancelled || !c.hosted) return;
+      setHosted(true);
+      setMethod("card");
+    });
     return () => {
       cancelled = true;
     };
@@ -425,12 +442,12 @@ function CreateEventForm({
               payment = null;
               throw new Error(
                 outcome === "reversed"
-                  ? "OneKhusa reversed this payment. Nothing was published — start a new payment to try again."
+                  ? "This payment was reversed. Nothing was published — start a new payment to try again."
                   : "The payment was declined or cancelled. Nothing was published and you have not been charged.",
               );
             } else {
               throw new Error(
-                `OneKhusa hasn't confirmed payment #${payment.id} yet. If you approved it, press the button again to check that same payment — you will not be charged twice.`,
+                `We haven't received confirmation of payment #${payment.id} yet. If you approved it, press the button again to check that same payment — you will not be charged twice.`,
               );
             }
           }
@@ -634,7 +651,7 @@ function CreateEventForm({
       <Card>
         <h2 className="text-sm font-bold text-navy-950">Publishing fee</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          {fee ? `Publishing a listing costs ${formatPrice(fee.amount, fee.currency)}, paid securely through OneKhusa.` : "Loading the publishing fee…"}
+          {fee ? `Publishing a listing costs ${formatPrice(fee.amount, fee.currency)}, paid securely online.` : "Loading the publishing fee…"}
         </p>
         {feePayment && (
           <p className={`mt-2 text-sm font-semibold ${feePayment.status === "succeeded" ? "text-success" : "text-navy-950"}`}>
@@ -657,22 +674,16 @@ function CreateEventForm({
             )}
           </p>
         )}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="method" className="text-sm font-medium text-ink">Pay with</label>
-            <select id="method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} disabled={Boolean(feePayment)} className={`mt-1.5 ${inputClass} h-12`}>
-              <option value="tnm">TNM Mpamba</option>
-              <option value="airtel">Airtel Money</option>
-              <option value="card">Bank card</option>
-            </select>
-          </div>
-          {method !== "card" && (
-            <div>
-              <label htmlFor="payPhone" className="text-sm font-medium text-ink">Mobile money number</label>
-              <input id="payPhone" type="tel" inputMode="tel" autoComplete="tel" value={payPhone} onChange={(e) => setPayPhone(e.target.value)} disabled={Boolean(feePayment)} placeholder="0999 000 000" className={`mt-1.5 ${inputClass} h-12`} />
-              <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number.</p>
-            </div>
-          )}
+        <div className="mt-4">
+          <PaymentChoice
+            idPrefix="fee"
+            method={method}
+            onMethodChange={(m) => setMethod(m)}
+            phone={payPhone}
+            onPhoneChange={setPayPhone}
+            hosted={hosted}
+            disabled={Boolean(feePayment)}
+          />
         </div>
       </Card>
 
