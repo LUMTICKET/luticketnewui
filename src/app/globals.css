@@ -119,3 +119,11 @@ body {
 .workspace-scrollbar-dark::-webkit-scrollbar-thumb:hover {
   background: #78879b;
 }
+
+@media (min-width: 64rem) {
+  html:has(.workspace-shell),
+  body:has(.workspace-shell) {
+    height: 100%;
+    overflow: hidden;
+  }
+}

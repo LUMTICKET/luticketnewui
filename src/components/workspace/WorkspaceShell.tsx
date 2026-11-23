@@ -251,7 +251,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
   return (
     <WorkspaceContext.Provider value={{ role, token, user, profile, profileError, reloadProfile, staffPreview }}>
-      <div className="min-h-screen bg-surface lg:h-dvh lg:overflow-hidden">
+      <div className="workspace-shell min-h-screen bg-surface lg:h-dvh lg:min-h-0 lg:overflow-hidden">
         <div className="flex min-h-screen flex-col bg-surface lg:h-full lg:min-h-0 lg:overflow-hidden">
           {/* top bar */}
           <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 bg-surface/95 px-4 backdrop-blur sm:px-6 lg:static lg:h-24 lg:gap-0 lg:px-0 lg:backdrop-blur-none">
