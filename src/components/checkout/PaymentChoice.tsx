@@ -46,14 +46,14 @@ export function PaymentChoice({
         <legend className="text-sm font-medium text-ink">Pay with</legend>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {OPTIONS.map((option) => (
-            <label key={option.value} className={disabled ? "cursor-not-allowed" : "cursor-pointer"}>
+            <label key={option.value} className={`relative block ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
               <input
                 type="radio"
                 name={`${idPrefix}-method`}
                 value={option.value}
                 checked={method === option.value}
                 onChange={() => onMethodChange(option.value)}
-                className="peer sr-only"
+                className="peer absolute inset-0 z-10 h-full w-full cursor-[inherit] opacity-0"
               />
               <span className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-line px-1.5 py-3 text-center transition-colors peer-checked:border-navy-950 peer-checked:bg-navy-950/5 peer-checked:ring-1 peer-checked:ring-navy-950 peer-focus-visible:ring-2 peer-focus-visible:ring-navy-400 peer-disabled:opacity-60">
                 <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-line bg-white">
@@ -67,34 +67,27 @@ export function PaymentChoice({
         </div>
       </fieldset>
 
-      <div className="mt-4 min-h-36">
-        {method !== "card" ? (
-          <div>
-            <label htmlFor={`${idPrefix}-phone`} className="text-sm font-medium text-ink">
-              {method === "tnm" ? "TNM Mpamba number" : "Airtel Money number"}
-            </label>
-            <input
-              id={`${idPrefix}-phone`}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => onPhoneChange(e.target.value)}
-              disabled={disabled}
-              placeholder={method === "tnm" ? "0888 123 456" : "0999 123 456"}
-              className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400"
-            />
-            <p className="mt-1 text-xs text-ink-muted">
-              You&apos;ll get a PIN prompt on this number. Use the number registered for{" "}
-              {method === "tnm" ? "TNM Mpamba" : "Airtel Money"}.
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-ink-muted">
-            You&apos;ll enter your card details on PayChangu&apos;s secure page, which opens in a new tab.
-          </p>
-        )}
-      </div>
+      {method !== "card" ? (
+        <div className="mt-4 min-h-[9.5rem]">
+          <label htmlFor={`${idPrefix}-phone`} className="text-sm font-medium text-ink">
+            {method === "tnm" ? "TNM Mpamba number" : "Airtel Money number"}
+          </label>
+          <input
+            id={`${idPrefix}-phone`}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => onPhoneChange(e.target.value)}
+            disabled={disabled}
+            placeholder={method === "tnm" ? "0888 123 456" : "0999 123 456"}
+            className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400"
+          />
+          <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number. Use the number registered for {method === "tnm" ? "TNM Mpamba" : "Airtel Money"}.</p>
+        </div>
+      ) : (
+        <p className="mt-4 min-h-[9.5rem] text-sm text-ink-muted">You&apos;ll enter your card details on PayChangu&apos;s secure page, which opens in a new tab.</p>
+      )}
 
     </div>
   );

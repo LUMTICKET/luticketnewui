@@ -462,7 +462,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
               </div>
             </aside>
 
-            <main className="workspace-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-8 sm:px-6 lg:px-12">
+            <main className="workspace-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-24 pt-8 sm:px-6 lg:px-12">
               <div className="w-full">
                 {staffPreview && (
                   <p role="note" className="mb-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
