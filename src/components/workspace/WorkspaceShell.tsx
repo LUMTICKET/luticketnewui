@@ -250,9 +250,10 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
   return (
     <WorkspaceContext.Provider value={{ role, token, user, profile, profileError, reloadProfile, staffPreview }}>
-      <div className="flex min-h-screen flex-col bg-surface lg:h-screen lg:min-h-0 lg:overflow-hidden">
+      <div className="min-h-screen bg-surface lg:h-screen lg:overflow-hidden">
+        <div className="flex min-h-screen flex-col bg-surface lg:h-full lg:min-h-0 lg:overflow-hidden">
           {/* top bar */}
-          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:static lg:h-24 lg:gap-0 lg:px-0 lg:backdrop-blur-none">
+          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 bg-surface/95 px-4 backdrop-blur sm:px-6 lg:static lg:h-24 lg:gap-0 lg:px-0 lg:backdrop-blur-none">
             <div className="lg:flex lg:w-72 lg:shrink-0 lg:px-9">
               <Link href={config.landing} aria-label={`${config.workspace} home`}>
                 <Logo markSize={30} />
@@ -337,7 +338,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
           <div className="flex min-h-0 flex-1">
             {/* sidebar */}
-            <aside className="hidden w-72 shrink-0 flex-col bg-navy-950 text-navy-100 lg:flex">
+            <aside className="hidden w-72 shrink-0 flex-col rounded-tr-[3rem] bg-navy-950 text-navy-100 lg:flex">
               <div className="px-8 pb-2 pt-9">
                 <Link
                   href={workspaceHref(role, primary.slug)}
@@ -399,7 +400,8 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
               </div>
             </aside>
 
-            <main className="min-w-0 flex-1 overflow-y-auto bg-surface-alt px-4 py-8 sm:px-6 lg:px-10 xl:px-12">
+            <main className="min-w-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-12">
+              <div className="w-full">
                 {staffPreview && (
                   <p role="note" className="mb-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
                     <strong>Preview access.</strong> The API doesn&apos;t report staff roles yet, so this console is open to
@@ -408,8 +410,10 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
                   </p>
                 )}
                 {children}
+              </div>
             </main>
           </div>
+        </div>
       </div>
     </WorkspaceContext.Provider>
   );
