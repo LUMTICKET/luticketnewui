@@ -640,11 +640,15 @@ function CreateEventForm({
           {fee ? `Publishing a listing costs ${formatPrice(fee.amount, fee.currency)}, paid securely online.` : "Loading the publishing fee…"}
         </p>
         {feePayment && (
-          <p className={`mt-2 text-sm font-semibold ${feePayment.status === "succeeded" ? "text-success" : "text-navy-950"}`}>
-            {feePayment.status === "succeeded" ? "Fee paid" : "Payment pending"} · payment #{feePayment.id}
+          <div className={`mt-2 text-sm ${feePayment.status === "succeeded" ? "text-success" : "text-navy-950"}`}>
+            <p className="font-semibold">
+              {feePayment.status === "succeeded" ? "Fee paid" : "Payment pending"} · payment #{feePayment.id}
+            </p>
             {feePayment.status !== "succeeded" && (
-              <>
-                {" — "}
+              <div className="mt-2">
+                <p className="text-xs text-ink-muted">
+                  Provider choices are locked while this payment is pending. Starting over clears the saved payment here, but does not cancel an active payment or phone prompt.
+                </p>
                 <button
                   type="button"
                   onClick={() => {
@@ -652,13 +656,13 @@ function CreateEventForm({
                     setPayNote("");
                     setError("");
                   }}
-                  className="font-semibold text-ink-muted underline hover:text-navy-950"
+                  className="mt-1 font-semibold text-ink-muted underline hover:text-navy-950"
                 >
-                  start over with another number
+                  Start over and choose another provider
                 </button>
-              </>
+              </div>
             )}
-          </p>
+          </div>
         )}
         <div className="mt-4">
           <PaymentChoice
