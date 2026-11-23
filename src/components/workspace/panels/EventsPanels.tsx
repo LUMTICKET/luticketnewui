@@ -372,9 +372,15 @@ function CreateEventForm({
           return setError("Enter a valid mobile money number for the payment prompt.");
         }
 
+        const checkoutTab =
+          method === "card" && feePayment?.status !== "succeeded" && (!feePayment || feePayment.checkoutUrl)
+            ? window.open("about:blank", "_blank")
+            : null;
+        if (checkoutTab) checkoutTab.opener = null;
         setBusy(true);
         // Reuse the payment already started for this listing instead of creating another.
         let payment = feePayment;
+        let checkoutTabOpened = false;
 
         try {
           if (!payment) {
@@ -394,17 +400,25 @@ function CreateEventForm({
               checkoutUrl: started.checkoutUrl,
             };
             rememberPayment(payment);
+          }
+
+          if (checkoutTab && !checkoutTab.closed) {
             if (payment.checkoutUrl && payment.status !== "succeeded") {
-              // A popup opened after an await can be blocked, so the checkout link is also rendered below.
-              window.open(payment.checkoutUrl, "_blank", "noopener");
-              setPayNote("Complete the payment in the new tab. We'll confirm it here automatically.");
+              checkoutTab.location.replace(payment.checkoutUrl);
+              checkoutTabOpened = true;
+            } else {
+              checkoutTab.close();
             }
           }
 
           if (payment.status !== "succeeded") {
             setPayNote(
-              payment.checkoutUrl || payment.method === "card"
-                ? "Waiting for your payment to be confirmed…"
+              payment.checkoutUrl
+                ? checkoutTabOpened
+                  ? "Complete payment in the secure checkout tab. We'll confirm it here automatically."
+                  : "Use the secure checkout link below. We'll confirm payment here automatically."
+                : payment.method === "card"
+                  ? "Waiting for the secure checkout link…"
                 : "Waiting for you to approve the prompt on your phone…",
             );
             const outcome = await waitForPayment(token, profile.id, payment.id, {
@@ -464,6 +478,7 @@ function CreateEventForm({
           form.reset();
         } catch (submitError) {
           const base = submitError instanceof Error ? submitError.message : "Could not publish this listing.";
+          if (checkoutTab && !checkoutTab.closed && !checkoutTabOpened) checkoutTab.close();
           setPayNote("");
           // A 409 from POST /api/events means this fee payment can't back another listing
           // (for example it was already used elsewhere), so let the business pay again.
@@ -661,7 +676,7 @@ function CreateEventForm({
       {payNote && <p role="status" className="rounded-lg bg-surface-alt px-3 py-2 text-sm text-ink">{payNote}</p>}
       {feePayment?.checkoutUrl && feePayment.status !== "succeeded" && (
         <a href={feePayment.checkoutUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-navy-950 underline">
-          Payment page didn&apos;t open? Open the secure checkout here
+          Continue to secure checkout
         </a>
       )}
       {error && <p role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
