@@ -1,11 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import type { PaymentMethod } from "@/lib/checkout";
 
-const OPTIONS: { value: PaymentMethod; label: string; note: string }[] = [
-  { value: "tnm", label: "TNM Mpamba", note: "PIN prompt on your phone" },
-  { value: "airtel", label: "Airtel Money", note: "PIN prompt on your phone" },
-  { value: "card", label: "Bank card", note: "Secure PayChangu page" },
+const OPTIONS: { value: PaymentMethod; label: string; note: string; icon: string }[] = [
+  { value: "tnm", label: "TNM Mpamba", note: "PIN prompt on your phone", icon: "/icons/tnm-mpamba.jpg" },
+  { value: "airtel", label: "Airtel Money", note: "PIN prompt on your phone", icon: "/icons/airtelmoney.png" },
+  { value: "card", label: "Bank card", note: "Secure PayChangu page", icon: "/icons/bank-icon.jpg" },
 ];
 
 /**
@@ -43,7 +44,7 @@ export function PaymentChoice({
     <div>
       <fieldset disabled={disabled} className="min-w-0">
         <legend className="text-sm font-medium text-ink">Pay with</legend>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           {OPTIONS.map((option) => (
             <label key={option.value} className="cursor-pointer">
               <input
@@ -54,9 +55,12 @@ export function PaymentChoice({
                 onChange={() => onMethodChange(option.value)}
                 className="peer sr-only"
               />
-              <span className="block rounded-xl border border-line px-3 py-2.5 text-sm transition-colors peer-checked:border-navy-950 peer-checked:bg-navy-950/5 peer-focus-visible:ring-2 peer-focus-visible:ring-navy-400 peer-disabled:opacity-60">
-                <span className="block font-semibold text-navy-950">{option.label}</span>
-                <span className="block text-xs text-ink-muted">{option.note}</span>
+              <span className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-line px-1.5 py-3 text-center transition-colors peer-checked:border-navy-950 peer-checked:bg-navy-950/5 peer-checked:ring-1 peer-checked:ring-navy-950 peer-focus-visible:ring-2 peer-focus-visible:ring-navy-400 peer-disabled:opacity-60">
+                <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-line bg-white">
+                  <Image src={option.icon} alt="" width={40} height={40} className="h-10 w-10 object-contain" />
+                </span>
+                <span className="text-xs font-semibold leading-tight text-navy-950 sm:text-sm">{option.label}</span>
+                <span className="hidden text-xs text-ink-muted sm:block">{option.note}</span>
               </span>
             </label>
           ))}
