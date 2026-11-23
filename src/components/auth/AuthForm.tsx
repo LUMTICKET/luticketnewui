@@ -32,7 +32,7 @@ import { AuthDivider, SocialAuthButtons } from "@/components/auth/SocialAuthButt
 type AuthMode = "login" | "signup";
 
 const inputClasses =
-  "mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400";
+  "mt-1.5 h-12 w-full rounded-xl border border-line bg-surface-alt px-4 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-navy-950 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-gold-500/40";
 
 /**
  * Where a freshly authenticated account goes. The account of record decides:
@@ -68,6 +68,7 @@ export function AuthForm({
   const isStaffPortal = portal === "staff" && !isSignup;
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   // Individual vs. company, asked up front for business accounts (only a
   // company can invite staff — see TeamPanel). Carried to the KYB form via
@@ -195,10 +196,25 @@ export function AuthForm({
     );
   }
 
+  const social = (
+    <>
+      <div className="mt-6">
+        <AuthDivider>{isSignup ? "or sign up with" : "or log in with"}</AuthDivider>
+      </div>
+      <div className="mt-5">
+        <SocialAuthButtons
+          label={isSignup ? "Sign up" : "Log in"}
+          onGoogle={handleGoogleIdToken}
+          onGoogleError={setError}
+        />
+      </div>
+    </>
+  );
+
   return (
     <>
       {isStaffPortal && (
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-surface-alt p-4">
+        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-line bg-surface-alt p-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-950 text-white">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M12 3l7 3v5.5c0 4.2-2.9 7.6-7 9.5-4.1-1.9-7-5.3-7-9.5V6l7-3z" />
@@ -214,18 +230,6 @@ export function AuthForm({
           </div>
         </div>
       )}
-
-      <div className="mt-6">
-        <SocialAuthButtons
-          label={isSignup ? "Sign up" : "Log in"}
-          onGoogle={handleGoogleIdToken}
-          onGoogleError={setError}
-        />
-      </div>
-
-      <div className="mt-6">
-        <AuthDivider>or with email</AuthDivider>
-      </div>
 
       <form
         className="mt-6 flex flex-col gap-4"
@@ -243,7 +247,7 @@ export function AuthForm({
           <div>
             <label htmlFor="businessName" className="text-sm font-medium text-ink">
               Business or trading name{" "}
-              <span className="font-normal text-ink-faint">(optional — pick later)</span>
+              <span className="font-normal text-ink-faint">(optional)</span>
             </label>
             <input
               id="businessName"
@@ -260,7 +264,7 @@ export function AuthForm({
 
         {isSignup && (
           <div>
-            <span className="text-sm font-medium text-ink">What type of account are you creating?</span>
+            <span className="text-sm font-medium text-ink">Account type</span>
             <div role="radiogroup" aria-label="Account type" className="mt-1.5 grid grid-cols-2 gap-2.5">
               {(
                 [
@@ -277,7 +281,7 @@ export function AuthForm({
                   className={`rounded-xl border p-3 text-left transition-colors ${
                     accountType === option.value
                       ? "border-navy-950 bg-navy-50 ring-1 ring-navy-950"
-                      : "border-line bg-surface hover:border-navy-300"
+                      : "border-line bg-surface-alt hover:border-navy-300"
                   }`}
                 >
                   <span className="block text-sm font-semibold text-navy-950">{option.label}</span>
@@ -291,7 +295,7 @@ export function AuthForm({
         {isSignup && (
           <div>
             <label htmlFor="country" className="text-sm font-medium text-ink">Country</label>
-            <select id="country" name="country" required className={`${inputClasses} bg-surface`} defaultValue={countries[0].code}>
+            <select id="country" name="country" required className={inputClasses} defaultValue={countries[0].code}>
               {countries.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name}</option>)}
             </select>
           </div>
@@ -314,32 +318,58 @@ export function AuthForm({
 
         <div>
           <label htmlFor="password" className="text-sm font-medium text-ink">Password</label>
-          <input id="password" name="password" type="password" required minLength={8} autoComplete={isSignup ? "new-password" : "current-password"} className={inputClasses} placeholder={isSignup ? "At least 8 characters" : "••••••••"} />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={8}
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              className={`${inputClasses} pr-12`}
+              placeholder={isSignup ? "At least 8 characters" : "Password"}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              className="absolute right-1.5 top-3 flex h-9 w-9 items-center justify-center rounded-lg text-ink-faint transition-colors hover:text-navy-950"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                <circle cx="12" cy="12" r="3" />
+                {!showPassword && <path d="M4 4l16 16" />}
+              </svg>
+            </button>
+          </div>
         </div>
 
         {!isSignup && (
-          <div className="flex items-center justify-between text-sm">
+          <div className="-mt-1 flex items-center justify-between text-sm">
             <label className="flex items-center gap-2 text-ink-muted">
               <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4 accent-navy-950" />
               Keep me signed in
             </label>
-            <Link href="/help" className="font-medium text-navy-950 hover:text-gold-600">Forgot password?</Link>
+            <Link href="/help" className="text-ink-muted hover:text-navy-950">Forgot password?</Link>
           </div>
         )}
 
         {isSignup && (
           <label className="flex items-start gap-2 text-sm text-ink-muted">
             <input name="terms" type="checkbox" required className="mt-0.5 h-4 w-4 accent-navy-950" />
-            I agree to the <Link href="/legal/terms" className="font-medium text-navy-950">Terms of service</Link> and <Link href="/legal/privacy" className="font-medium text-navy-950">Privacy policy</Link>
+            <span>I agree to the <Link href="/legal/terms" className="font-medium text-navy-950 underline-offset-2 hover:underline">Terms of service</Link> and <Link href="/legal/privacy" className="font-medium text-navy-950 underline-offset-2 hover:underline">Privacy policy</Link></span>
           </label>
         )}
 
         {error && <p id="auth-error" role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>}
 
-        <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-2 w-full">
-          {busy ? "Please wait..." : isSignup ? "Create account" : "Sign in"}
+        <Button type="submit" variant="primary" size="lg" disabled={busy} className="w-full !rounded-xl">
+          {busy ? "Please wait..." : isSignup ? "Create account" : "Log in"}
         </Button>
       </form>
+
+      {!isStaffPortal && social}
     </>
   );
 }

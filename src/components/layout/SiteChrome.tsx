@@ -12,6 +12,8 @@ export function SiteChrome({
   hideOnHome?: boolean;
 }) {
   const pathname = usePathname();
+  // Login and signup are standalone screens: no site header or footer.
+  if (pathname === "/login" || pathname === "/signup") return null;
   if (isWorkspacePath(pathname) || (hideOnHome && pathname === "/")) return null;
   return <>{children}</>;
 }

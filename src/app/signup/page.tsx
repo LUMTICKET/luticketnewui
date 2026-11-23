@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { safeNext } from "@/lib/roles";
 
 export const metadata = {
@@ -12,20 +13,19 @@ export default async function SignupPage(props: PageProps<"/signup">) {
   const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : "/login";
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col justify-center px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold text-navy-950">Create your business account</h1>
-      <p className="mt-1 text-sm text-ink-muted">
-        Set up your Lumticket account, then choose the type of business you want to run.
-      </p>
-
+    <AuthShell
+      heading="Create your account"
+      intro="Set up your Lumticket account, then choose the type of business you run."
+      panelTitle="Start selling on Lumticket"
+      panelText="Bus operators, organizers, couriers and agents all start here. Set up in minutes and pick your business type next."
+      footer={
+        <p>
+          Already have an account?{" "}
+          <Link href={loginHref} className="font-semibold text-navy-950 hover:text-gold-600">Log in</Link>
+        </p>
+      }
+    >
       <AuthForm mode="signup" next={next} />
-
-      <p className="mt-6 text-center text-sm text-ink-muted">
-        Already have an account?{" "}
-        <Link href={loginHref} className="font-semibold text-navy-950 hover:text-gold-600">
-          Sign in
-        </Link>
-      </p>
-    </div>
+    </AuthShell>
   );
 }

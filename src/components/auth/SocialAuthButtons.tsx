@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const buttonClasses =
-  "inline-flex h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-surface text-sm font-semibold text-ink transition-colors hover:border-navy-300 hover:bg-surface-alt";
+  "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface text-sm font-medium text-ink transition-colors hover:border-navy-300 hover:bg-surface-alt";
 
 interface GoogleIdentity {
   accounts: {
@@ -98,7 +98,7 @@ export function SocialAuthButtons({
             size: "large",
             text: label === "Sign up" ? "signup_with" : "signin_with",
             shape: "rectangular",
-            width: 400,
+            width: Math.max(160, Math.min(400, Math.round(googleButtonRef.current.clientWidth))),
           });
         }
         setGoogleReady(true);
@@ -114,15 +114,15 @@ export function SocialAuthButtons({
   }, []);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div
         ref={googleButtonRef}
-        className="flex min-h-12 w-full items-center justify-center overflow-hidden"
+        className="flex min-h-11 w-full items-center justify-center overflow-hidden"
         aria-label={googleReady ? "Continue with Google" : "Loading Google sign-in"}
       />
       <button type="button" className={buttonClasses}>
         <AppleIcon />
-        {label === "continue" ? "Continue with Apple" : `${label} with Apple`}
+        Apple
       </button>
     </div>
   );
@@ -130,7 +130,7 @@ export function SocialAuthButtons({
 
 export function AuthDivider({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-ink-faint">
+    <div className="flex items-center gap-3 text-xs text-ink-faint">
       <span className="h-px flex-1 bg-line" />
       {children}
       <span className="h-px flex-1 bg-line" />

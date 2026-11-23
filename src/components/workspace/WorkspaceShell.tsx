@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Logo, LogoMark } from "@/components/layout/Logo";
-import { RoleIcon } from "@/components/auth/RoleSelector";
 import {
   ApiError,
   clearAuthSession,
@@ -19,6 +18,16 @@ import {
 import { ROLES, getStoredRole, resolveRole, roleLanding, saveRole, staffAccess, type AccountRole } from "@/lib/roles";
 import { WORKSPACE_NAV, workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { WorkspaceContext } from "./WorkspaceContext";
+import { NavIcon } from "./NavIcon";
+
+/** The one action a role most often starts from; shown as the pill at the top of the sidebar. */
+const PRIMARY_ACTION: Record<WorkspaceRole, { slug: string; label: string }> = {
+  "bus-operator": { slug: "trips/new", label: "Publish a trip" },
+  courier: { slug: "parcels", label: "Open parcel queue" },
+  organizer: { slug: "events/new", label: "Create event" },
+  agent: { slug: "sell", label: "New sale" },
+  staff: { slug: "kyc", label: "Review KYC" },
+};
 
 type ShellState = "checking" | "ready" | "wrong-role" | "denied";
 
@@ -40,6 +49,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
   const [profile, setProfile] = useState<BusinessProfile | null | undefined>(config.business ? undefined : null);
   const [profileError, setProfileError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -213,80 +223,96 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   const displayName = user?.name || user?.email || config.label;
 
+  const primary = PRIMARY_ACTION[role];
+  const profileStatus = !config.business
+    ? null
+    : !profile
+      ? { label: "Profile not set up", pct: 12 }
+      : profile.isVerified === true
+        ? { label: "Verified business", pct: 100 }
+        : { label: "Verification in review", pct: 60 };
+
+  function runSearch(event: React.FormEvent) {
+    event.preventDefault();
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    const hit = items.find((item) => item.label.toLowerCase().includes(q));
+    if (hit) {
+      router.push(hit.href);
+      setQuery("");
+    }
+  }
+
+  const auditItem = items.find((item) => item.href.endsWith("/audit"));
+  const profileItem = items.find((item) => item.href.endsWith("/profile"));
+  const iconBtn =
+    "flex h-10 w-10 items-center justify-center rounded-full text-navy-950 transition-colors hover:bg-navy-50";
+
   return (
     <WorkspaceContext.Provider value={{ role, token, user, profile, profileError, reloadProfile, staffPreview }}>
-      <div className="min-h-screen lg:flex">
-        <aside className="hidden w-64 shrink-0 bg-navy-950 text-navy-100 lg:block">
-          <div className="sticky top-0 flex h-screen flex-col">
-            <div className="px-5 py-5">
+      <div className="min-h-screen bg-surface lg:h-screen lg:overflow-hidden lg:bg-navy-950 lg:p-5">
+        <div className="flex min-h-screen flex-col bg-surface lg:h-full lg:min-h-0 lg:overflow-hidden lg:rounded-[2.5rem]">
+          {/* top bar */}
+          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 bg-surface/95 px-4 backdrop-blur sm:px-6 lg:static lg:h-24 lg:gap-0 lg:px-0 lg:backdrop-blur-none">
+            <div className="lg:flex lg:w-72 lg:shrink-0 lg:px-9">
               <Link href={config.landing} aria-label={`${config.workspace} home`}>
-                <Logo tone="light" />
+                <Logo markSize={30} />
               </Link>
             </div>
 
-            <div className="mx-4 mb-4 flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500 text-navy-950">
-                <RoleIcon role={role} size={18} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gold-400">Workspace</p>
-                <p className="truncate text-sm font-semibold text-white">{config.workspace}</p>
-              </div>
-            </div>
+            <form onSubmit={runSearch} role="search" className="relative ml-auto hidden max-w-md flex-1 md:block lg:ml-0">
+              <svg className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="M16 16l4 4" />
+              </svg>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label="Search workspace pages"
+                placeholder="Jump to a page…"
+                className="h-11 w-full rounded-full bg-navy-50 pl-11 pr-4 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-gold-500/50"
+              />
+            </form>
 
-            <nav aria-label={`${config.workspace} navigation`} className="flex-1 overflow-y-auto px-3 pb-4">
-              {groups.map((group) => (
-                <div key={group.label} className="mt-4 first:mt-0">
-                  <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-navy-300">{group.label}</p>
-                  <div className="mt-1.5 flex flex-col gap-0.5">
-                    {group.items.map((item) => {
-                      const href = workspaceHref(role, item.slug);
-                      const active = href === activeHref;
-                      return (
-                        <Link
-                          key={href}
-                          href={href}
-                          aria-current={active ? "page" : undefined}
-                          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? "bg-white/10 text-white shadow-[inset_3px_0_0_0_var(--color-gold-500)]"
-                              : "text-navy-200 hover:bg-white/5 hover:text-white"
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
+            <div className="ml-auto flex items-center gap-1 lg:pr-9">
+              {auditItem && (
+                <Link href={auditItem.href} aria-label="Activity" title="Activity" className={iconBtn}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15L6 16zM10 20a2 2 0 004 0" />
+                  </svg>
+                </Link>
+              )}
+              <Link href="/help" aria-label="Help centre" title="Help centre" className={iconBtn}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="M9.6 9.5a2.5 2.5 0 114 2c-.9.6-1.6 1-1.6 2M12 16.8h.01" />
+                </svg>
+              </Link>
+              {profileItem && (
+                <Link href={profileItem.href} aria-label="Business profile" title="Business profile" className={iconBtn}>
+                  <NavIcon slug="profile" size={20} />
+                </Link>
+              )}
+              <div className="ml-3 flex items-center gap-3">
+                <div className="hidden text-right sm:block">
+                  <p className="max-w-[12rem] truncate text-sm font-medium text-navy-950">{displayName}</p>
+                  <p className="text-xs text-ink-faint">{config.label}</p>
                 </div>
-              ))}
-            </nav>
-
-            <div className="flex flex-col gap-1.5 border-t border-white/10 px-6 py-4 text-xs">
-              <Link href="/" className="text-navy-200 hover:text-white">
-                ← Lumticket public site
-              </Link>
-              <Link href="/help" className="text-navy-200 hover:text-white">
-                Help centre
-              </Link>
-            </div>
-          </div>
-        </aside>
-
-        <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:px-8">
-            <Link href={config.landing} className="lg:hidden" aria-label={`${config.workspace} home`}>
-              <Logo markSize={26} />
-            </Link>
-            <p className="hidden text-sm font-semibold text-navy-950 lg:block">{config.workspace}</p>
-            <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="max-w-[16rem] truncate text-sm font-medium text-navy-950">{displayName}</p>
-                <p className="text-xs text-ink-faint">{config.label}</p>
+                <span
+                  aria-hidden
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-950 text-sm font-semibold text-white"
+                >
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  disabled={signingOut}
+                  className="rounded-full px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-navy-50 hover:text-navy-950 disabled:opacity-50"
+                >
+                  {signingOut ? "Signing out…" : "Sign out"}
+                </button>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={signOut} disabled={signingOut}>
-                {signingOut ? "Signing out…" : "Sign out"}
-              </Button>
             </div>
           </header>
 
@@ -302,7 +328,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
                 className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                   item.href === activeHref
                     ? "bg-navy-950 text-white"
-                    : "bg-surface-alt text-ink-muted hover:text-navy-950"
+                    : "bg-navy-50 text-ink-muted hover:text-navy-950"
                 }`}
               >
                 {item.label}
@@ -310,16 +336,83 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
             ))}
           </nav>
 
-          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-            {staffPreview && (
-              <p role="note" className="mb-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
-                <strong>Preview access.</strong> The API doesn&apos;t report staff roles yet, so this console is open to
-                any staff-portal sign-in. Enforce staff provisioning on the API (or set
-                NEXT_PUBLIC_STAFF_EMAIL_DOMAINS) before go-live.
-              </p>
-            )}
-            {children}
-          </main>
+          <div className="flex min-h-0 flex-1">
+            {/* sidebar */}
+            <aside className="hidden w-72 shrink-0 flex-col rounded-tr-[3rem] bg-navy-950 text-navy-100 lg:flex">
+              <div className="px-8 pb-2 pt-9">
+                <Link
+                  href={workspaceHref(role, primary.slug)}
+                  className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-100"
+                >
+                  {primary.label}
+                </Link>
+              </div>
+
+              <nav aria-label={`${config.workspace} navigation`} className="flex-1 overflow-y-auto px-5 pb-4 pt-4">
+                {groups.map((group) => (
+                  <div key={group.label} className="mt-5 first:mt-0">
+                    <p className="px-3 text-xs text-navy-300">{group.label}</p>
+                    <div className="mt-1.5 flex flex-col gap-0.5">
+                      {group.items.map((item) => {
+                        const href = workspaceHref(role, item.slug);
+                        const active = href === activeHref;
+                        return (
+                          <Link
+                            key={href}
+                            href={href}
+                            aria-current={active ? "page" : undefined}
+                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                              active
+                                ? "bg-white/15 font-semibold text-white"
+                                : "font-medium text-navy-200 hover:bg-white/8 hover:text-white"
+                            }`}
+                          >
+                            <span className={active ? "text-gold-400" : "text-navy-300"}>
+                              <NavIcon slug={item.slug} />
+                            </span>
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+
+              <div className="border-t border-white/10 px-8 py-5 text-xs">
+                {profileStatus && (
+                  <div className="mb-4">
+                    <p className="font-semibold text-white">Account status</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15" role="presentation">
+                      <div className="h-full rounded-full bg-gold-500" style={{ width: `${profileStatus.pct}%` }} />
+                    </div>
+                    <p className="mt-1.5 text-navy-200">{profileStatus.label}</p>
+                  </div>
+                )}
+                {user?.businessId && (
+                  <p className="mb-3 truncate text-navy-200">
+                    Business ID <span className="font-mono font-semibold text-white">{user.businessId}</span>
+                  </p>
+                )}
+                <Link href="/" className="font-semibold text-white hover:text-gold-300">
+                  Lumticket public site ↗
+                </Link>
+              </div>
+            </aside>
+
+            <main className="min-w-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-10">
+              <div className="mx-auto max-w-6xl">
+                {staffPreview && (
+                  <p role="note" className="mb-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">
+                    <strong>Preview access.</strong> The API doesn&apos;t report staff roles yet, so this console is open to
+                    any staff-portal sign-in. Enforce staff provisioning on the API (or set
+                    NEXT_PUBLIC_STAFF_EMAIL_DOMAINS) before go-live.
+                  </p>
+                )}
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
       </div>
     </WorkspaceContext.Provider>

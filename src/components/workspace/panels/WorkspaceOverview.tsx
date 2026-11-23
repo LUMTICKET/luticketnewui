@@ -9,6 +9,7 @@ import type { AuthUser } from "@/lib/auth";
 import { workspaceHref, type WorkspaceRole } from "@/lib/workspace-nav";
 import { formatPrice } from "@/lib/format";
 import { Card, DemoBadge, StatCard } from "../ui";
+import { NavIcon } from "../NavIcon";
 import { useWorkspace } from "../WorkspaceContext";
 import { useDashboardData } from "../useDashboardData";
 
@@ -200,91 +201,48 @@ export function WorkspaceOverview() {
       ]
     : [];
 
-  return (
-    <div className="flex flex-col gap-8">
-      <section className="rounded-3xl bg-navy-950 p-7 text-white sm:p-9">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gold-400">{config.workspace}</p>
-        <h1 className="mt-2 text-3xl font-bold">
-          Welcome{firstName ? `, ${firstName}` : ""}
-        </h1>
-        <p className="mt-3 max-w-2xl text-navy-200">{content.tagline}</p>
+  const th = "px-4 py-3 text-left text-xs font-medium text-ink-faint";
+  const facts = [
+    user?.businessId && { label: "Business ID", value: user.businessId, mono: true },
+    businessName && { label: "Business", value: businessName },
+    ventureType && { label: "Type", value: ventureType },
+  ].filter(Boolean) as { label: string; value: string; mono?: boolean }[];
 
+  return (
+    <div className="flex flex-col gap-10">
+      <section>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-navy-950">
+            {config.workspace}
+          </h1>
+          <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-950 text-white">
+            <NavIcon slug="" size={18} />
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-ink-muted">
+          Welcome{firstName ? `, ${firstName}` : ""}. {content.tagline}
+        </p>
+        {facts.length > 0 && (
+          <dl className="mt-4 flex flex-wrap gap-2">
+            {facts.map((fact) => (
+              <div key={fact.label} className="flex items-center gap-2 rounded-full bg-navy-50 px-3.5 py-1.5 text-xs">
+                <dt className="text-ink-muted">{fact.label}</dt>
+                <dd className={`font-semibold text-navy-950 ${fact.mono ? "font-mono" : ""}`}>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         {config.business && profile === null && (
-          <LinkButton href={workspaceHref(role, "profile")} variant="accent" size="lg" className="mt-6">
+          <LinkButton href={workspaceHref(role, "profile")} variant="primary" size="md" className="mt-5">
             Complete your business profile
           </LinkButton>
         )}
-        {/* The account of record, spelled out: who is signed in, their Business
-            ID, the business they operate and the venture type they picked. */}
-        {(user?.name || user?.businessId || businessName || ventureType) && (
-          <dl className="mt-7 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-white/10 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            {user?.name && (
-              <div className="min-w-0">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Signed in as</dt>
-                <dd className="mt-1 truncate font-semibold text-white">{user.name}</dd>
-              </div>
-            )}
-            {user?.businessId && (
-              <div className="min-w-0">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business ID</dt>
-                <dd className="mt-1 truncate font-mono font-semibold text-white">{user.businessId}</dd>
-              </div>
-            )}
-            {businessName && (
-              <div className="min-w-0">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business name</dt>
-                <dd className="mt-1 truncate font-semibold text-white">{businessName}</dd>
-              </div>
-            )}
-            {ventureType && (
-              <div className="min-w-0">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Business type</dt>
-                <dd className="mt-1 truncate font-semibold text-white">{ventureType}</dd>
-              </div>
-            )}
-          </dl>
-        )}
-        {profileError && <p role="alert" className="mt-4 text-sm text-gold-300">{profileError}</p>}
+        {profileError && <p role="alert" className="mt-4 text-sm text-error">{profileError}</p>}
       </section>
-
-      {config.business && (
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-navy-950">Get set up</h2>
-            {!profile && <DemoBadge />}
-          </div>
-          <ol className="mt-4 flex flex-col divide-y divide-line">
-            {steps.map((step, index) => (
-              <li key={step.title} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
-                <span
-                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    step.done ? "bg-success text-white" : "bg-surface-alt text-navy-950"
-                  }`}
-                >
-                  {step.done ? "✓" : index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-navy-950">{step.title}</p>
-                  <p className="mt-0.5 text-sm text-ink-muted">{step.body}</p>
-                </div>
-                {"waiting" in step && step.waiting ? (
-                  <Badge tone="warning">In review</Badge>
-                ) : (
-                  !step.done && (
-                    <Link href={workspaceHref(role, step.slug)} className="shrink-0 text-sm font-semibold text-navy-950 hover:text-gold-600">
-                      Open →
-                    </Link>
-                  )
-                )}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-navy-950">At a glance</h2>
+          <h2 className="text-lg font-semibold text-navy-950">Quick access</h2>
           <div className="flex items-center gap-3">
             {config.business && profile && (
               <>
@@ -295,7 +253,7 @@ export function WorkspaceOverview() {
                     data.reload();
                     void reloadProfile();
                   }}
-                  className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-navy-950 transition-colors hover:bg-surface-alt"
+                  className="rounded-full bg-navy-50 px-3.5 py-1.5 text-xs font-semibold text-navy-950 transition-colors hover:bg-navy-100"
                 >
                   Refresh
                 </button>
@@ -304,9 +262,9 @@ export function WorkspaceOverview() {
             {(!config.business || !profile) && <DemoBadge />}
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {kpis.map((kpi) => (
-            <StatCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {kpis.map((kpi, index) => (
+            <StatCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} featured={index === 0} />
           ))}
         </div>
         {config.business && profile && Object.keys(data.errors).length > 0 && (
@@ -316,43 +274,108 @@ export function WorkspaceOverview() {
         )}
       </section>
 
+      {config.business && (
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-navy-950">Get set up</h2>
+            {!profile && <DemoBadge />}
+          </div>
+          <Card className="mt-4">
+            <ol className="flex flex-col divide-y divide-navy-100">
+              {steps.map((step, index) => (
+                <li key={step.title} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                  <span
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      step.done ? "bg-success text-white" : "bg-surface text-navy-950"
+                    }`}
+                  >
+                    {step.done ? "✓" : index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-navy-950">{step.title}</p>
+                    <p className="mt-0.5 text-sm text-ink-muted">{step.body}</p>
+                  </div>
+                  {"waiting" in step && step.waiting ? (
+                    <Badge tone="warning">In review</Badge>
+                  ) : (
+                    !step.done && (
+                      <Link href={workspaceHref(role, step.slug)} className="shrink-0 text-sm font-semibold text-navy-950 hover:text-gold-600">
+                        Open
+                      </Link>
+                    )
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </section>
+      )}
+
       <section>
-        <h2 className="text-lg font-bold text-navy-950">Jump in</h2>
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {content.actions.map((action) => (
-            <Link
-              key={action.slug}
-              href={workspaceHref(role, action.slug)}
-              className="rounded-2xl border border-line bg-surface p-5 transition-shadow hover:shadow-lg hover:shadow-navy-950/5"
-            >
-              <p className="font-semibold text-navy-950">{action.title}</p>
-              <p className="mt-1 text-sm text-ink-muted">{action.body}</p>
-              <span className="mt-3 inline-block text-sm font-semibold text-gold-600">Open →</span>
-            </Link>
-          ))}
+        <h2 className="text-lg font-semibold text-navy-950">All sections</h2>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-navy-200">
+              <tr>
+                <th className={th}>Name</th>
+                <th className={`${th} hidden sm:table-cell`}>What it does</th>
+                <th className={th}><span className="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {content.actions.map((action) => (
+                <tr key={action.slug} className="border-b border-navy-100 transition-colors last:border-0 hover:bg-navy-50">
+                  <td className="px-4 py-3.5">
+                    <Link href={workspaceHref(role, action.slug)} className="flex items-center gap-3 font-medium text-navy-950">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
+                        <NavIcon slug={action.slug} size={16} />
+                      </span>
+                      {action.title}
+                    </Link>
+                  </td>
+                  <td className="hidden px-4 py-3.5 text-ink-muted sm:table-cell">{action.body}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    <Link href={workspaceHref(role, action.slug)} className="font-semibold text-navy-950 hover:text-gold-600">
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
       {config.business && profile && data.audit.length > 0 && (
         <section>
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-navy-950">Recent activity</h2>
+            <h2 className="text-lg font-semibold text-navy-950">Recent activity</h2>
             <Link href={workspaceHref(role, "audit")} className="text-sm font-semibold text-navy-950 hover:text-gold-600">
-              Full audit log →
+              Full audit log
             </Link>
           </div>
-          <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-surface">
-            {data.audit.slice(-5).reverse().map((entry) => (
-              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <p className="text-sm font-medium text-navy-950">
-                  {auditLine(String(entry.action ?? ""), String(entry.resourceType ?? ""))}
-                </p>
-                <p className="text-xs text-ink-faint">
-                  {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-navy-200">
+                <tr>
+                  <th className={th}>Activity</th>
+                  <th className={th}>When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.audit.slice(-5).reverse().map((entry) => (
+                  <tr key={entry.id} className="border-b border-navy-100 last:border-0 hover:bg-navy-50">
+                    <td className="px-4 py-3.5 font-medium text-navy-950">
+                      {auditLine(String(entry.action ?? ""), String(entry.resourceType ?? ""))}
+                    </td>
+                    <td className="px-4 py-3.5 text-ink-muted">
+                      {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </div>
