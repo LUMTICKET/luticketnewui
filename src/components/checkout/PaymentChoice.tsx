@@ -67,27 +67,34 @@ export function PaymentChoice({
         </div>
       </fieldset>
 
-      {method !== "card" ? (
-        <div className="mt-4">
-          <label htmlFor={`${idPrefix}-phone`} className="text-sm font-medium text-ink">
-            {method === "tnm" ? "TNM Mpamba number" : "Airtel Money number"}
-          </label>
-          <input
-            id={`${idPrefix}-phone`}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={phone}
-            onChange={(e) => onPhoneChange(e.target.value)}
-            disabled={disabled}
-            placeholder={method === "tnm" ? "0888 123 456" : "0999 123 456"}
-            className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400"
-          />
-          <p className="mt-1 text-xs text-ink-muted">You&apos;ll get a PIN prompt on this number. Use the number registered for {method === "tnm" ? "TNM Mpamba" : "Airtel Money"}.</p>
-        </div>
-      ) : (
-        <p className="mt-4 text-sm text-ink-muted">You&apos;ll enter your card details on PayChangu&apos;s secure page, which opens in a new tab.</p>
-      )}
+      <div className="mt-4 min-h-36">
+        {method !== "card" ? (
+          <div>
+            <label htmlFor={`${idPrefix}-phone`} className="text-sm font-medium text-ink">
+              {method === "tnm" ? "TNM Mpamba number" : "Airtel Money number"}
+            </label>
+            <input
+              id={`${idPrefix}-phone`}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              disabled={disabled}
+              placeholder={method === "tnm" ? "0888 123 456" : "0999 123 456"}
+              className="mt-1.5 h-12 w-full rounded-xl border border-line px-3.5 text-sm focus:border-navy-400"
+            />
+            <p className="mt-1 text-xs text-ink-muted">
+              You&apos;ll get a PIN prompt on this number. Use the number registered for{" "}
+              {method === "tnm" ? "TNM Mpamba" : "Airtel Money"}.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-muted">
+            You&apos;ll enter your card details on PayChangu&apos;s secure page, which opens in a new tab.
+          </p>
+        )}
+      </div>
 
     </div>
   );
