@@ -50,6 +50,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
   const [profileError, setProfileError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
   const [query, setQuery] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,14 +251,51 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
   return (
     <WorkspaceContext.Provider value={{ role, token, user, profile, profileError, reloadProfile, staffPreview }}>
-      <div className="min-h-screen bg-surface lg:h-screen lg:overflow-hidden">
+      <div className="min-h-screen bg-surface lg:h-dvh lg:overflow-hidden">
         <div className="flex min-h-screen flex-col bg-surface lg:h-full lg:min-h-0 lg:overflow-hidden">
           {/* top bar */}
           <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 bg-surface/95 px-4 backdrop-blur sm:px-6 lg:static lg:h-24 lg:gap-0 lg:px-0 lg:backdrop-blur-none">
-            <div className="lg:flex lg:w-72 lg:shrink-0 lg:px-9">
+            <div
+              className={`flex shrink-0 items-center justify-between lg:px-2 ${
+                sidebarCollapsed ? "lg:w-20" : "lg:w-72 lg:px-9"
+              }`}
+            >
               <Link href={config.landing} aria-label={`${config.workspace} home`}>
-                <Logo markSize={30} />
+                {sidebarCollapsed ? <LogoMark size={26} /> : <Logo markSize={30} />}
               </Link>
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-expanded={!sidebarCollapsed}
+                aria-controls="workspace-sidebar"
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                className="hidden h-8 w-8 items-center justify-center rounded-full text-navy-700 transition-colors hover:bg-navy-50 lg:flex"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  {sidebarCollapsed ? (
+                    <>
+                      <path d="M9 5l7 7-7 7" />
+                      <path d="M4 5v14" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M15 5l-7 7 7 7" />
+                      <path d="M20 5v14" />
+                    </>
+                  )}
+                </svg>
+              </button>
             </div>
 
             <form onSubmit={runSearch} role="search" className="relative ml-auto hidden max-w-md flex-1 md:block lg:ml-0">
@@ -338,20 +376,36 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
 
           <div className="flex min-h-0 flex-1">
             {/* sidebar */}
-            <aside className="hidden w-72 shrink-0 flex-col rounded-tr-[3rem] bg-navy-950 text-navy-100 lg:flex">
-              <div className="px-8 pb-2 pt-9">
+            <aside
+              id="workspace-sidebar"
+              className={`hidden shrink-0 flex-col overflow-hidden rounded-tr-[3rem] bg-navy-950 text-navy-100 transition-[width] duration-200 lg:flex ${
+                sidebarCollapsed ? "w-20" : "w-72"
+              }`}
+            >
+              <div className={`pb-2 pt-9 ${sidebarCollapsed ? "px-4" : "px-8"}`}>
                 <Link
                   href={workspaceHref(role, primary.slug)}
-                  className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-100"
+                  aria-label={sidebarCollapsed ? primary.label : undefined}
+                  title={sidebarCollapsed ? primary.label : undefined}
+                  className={`flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-100 ${
+                    sidebarCollapsed ? "" : "px-2"
+                  }`}
                 >
-                  {primary.label}
+                  {sidebarCollapsed ? <NavIcon slug={primary.slug} size={20} /> : primary.label}
                 </Link>
               </div>
 
-              <nav aria-label={`${config.workspace} navigation`} className="flex-1 overflow-y-auto px-5 pb-4 pt-4">
+              <nav
+                aria-label={`${config.workspace} navigation`}
+                className={`workspace-scrollbar workspace-scrollbar-dark min-h-0 flex-1 overflow-y-auto pb-4 pt-4 ${
+                  sidebarCollapsed ? "px-2" : "px-5"
+                }`}
+              >
                 {groups.map((group) => (
                   <div key={group.label} className="mt-5 first:mt-0">
-                    <p className="px-3 text-xs text-navy-300">{group.label}</p>
+                    <p className={`px-3 text-xs text-navy-300 ${sidebarCollapsed ? "sr-only" : ""}`}>
+                      {group.label}
+                    </p>
                     <div className="mt-1.5 flex flex-col gap-0.5">
                       {group.items.map((item) => {
                         const href = workspaceHref(role, item.slug);
@@ -361,7 +415,11 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
                             key={href}
                             href={href}
                             aria-current={active ? "page" : undefined}
-                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                            aria-label={sidebarCollapsed ? item.label : undefined}
+                            title={sidebarCollapsed ? item.label : undefined}
+                            className={`flex items-center rounded-xl py-2.5 text-sm transition-colors ${
+                              sidebarCollapsed ? "justify-center px-0" : "gap-3 px-3"
+                            } ${
                               active
                                 ? "bg-white/15 font-semibold text-white"
                                 : "font-medium text-navy-200 hover:bg-white/8 hover:text-white"
@@ -370,7 +428,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
                             <span className={active ? "text-gold-400" : "text-navy-300"}>
                               <NavIcon slug={item.slug} />
                             </span>
-                            {item.label}
+                            <span className={sidebarCollapsed ? "sr-only" : ""}>{item.label}</span>
                           </Link>
                         );
                       })}
@@ -379,7 +437,11 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
                 ))}
               </nav>
 
-              <div className="border-t border-white/10 px-8 py-5 text-xs">
+              <div
+                className={`border-t border-white/10 py-5 text-xs ${
+                  sidebarCollapsed ? "hidden" : "px-8"
+                }`}
+              >
                 {profileStatus && (
                   <div className="mb-4">
                     <p className="font-semibold text-white">Account status</p>
@@ -400,7 +462,7 @@ export function WorkspaceShell({ role, children }: { role: WorkspaceRole; childr
               </div>
             </aside>
 
-            <main className="min-w-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-12">
+            <main className="workspace-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-8 sm:px-6 lg:px-12">
               <div className="w-full">
                 {staffPreview && (
                   <p role="note" className="mb-6 rounded-xl bg-warning-surface px-4 py-3 text-sm text-warning">

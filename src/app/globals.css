@@ -77,3 +77,45 @@ body {
   outline: 2px solid var(--color-gold-500);
   outline-offset: 2px;
 }
+
+.workspace-scrollbar {
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  scrollbar-width: thin;
+}
+
+.workspace-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid #f1f5f9;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.workspace-scrollbar-dark {
+  scrollbar-color: #52627a transparent;
+}
+
+.workspace-scrollbar-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workspace-scrollbar-dark::-webkit-scrollbar-thumb {
+  border-color: transparent;
+  background: #52627a;
+  background-clip: padding-box;
+}
+
+.workspace-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: #78879b;
+}
