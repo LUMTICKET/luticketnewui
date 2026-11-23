@@ -334,6 +334,20 @@ function CreateEventForm({
     }
   }
 
+  // Switching provider while a payment is still pending abandons that payment and starts clean with the
+  // new provider. A succeeded fee is never discarded: it stays paid and is reused to publish.
+  function changeMethod(next: PaymentMethod) {
+    if (next === method) return;
+    setMethod(next);
+    setError("");
+    if (feePayment && feePayment.status !== "succeeded") {
+      rememberPayment(null);
+      setPayNote("Provider changed. Press the button to pay with " + (next === "tnm" ? "TNM Mpamba" : next === "airtel" ? "Airtel Money" : "your bank card") + ".");
+    } else {
+      setPayNote("");
+    }
+  }
+
   function updateTier(index: number, patch: Partial<TicketTierInput>) {
     setTiers((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
   }
@@ -647,7 +661,7 @@ function CreateEventForm({
             {feePayment.status !== "succeeded" && (
               <div className="mt-2">
                 <p className="text-xs text-ink-muted">
-                  Provider choices are locked while this payment is pending. Starting over clears the saved payment here, but does not cancel an active payment or phone prompt.
+                  Want to pay another way? Pick a different provider below and we&apos;ll start a fresh payment. This does not cancel a prompt already sent to your phone, so decline it there.
                 </p>
                 <button
                   type="button"
@@ -658,7 +672,7 @@ function CreateEventForm({
                   }}
                   className="mt-1 font-semibold text-ink-muted underline hover:text-navy-950"
                 >
-                  Start over and choose another provider
+                  Clear this pending payment
                 </button>
               </div>
             )}
@@ -668,11 +682,11 @@ function CreateEventForm({
           <PaymentChoice
             idPrefix="fee"
             method={method}
-            onMethodChange={(m) => setMethod(m)}
+            onMethodChange={changeMethod}
             phone={payPhone}
             onPhoneChange={setPayPhone}
             hosted={hosted}
-            disabled={Boolean(feePayment)}
+            disabled={busy || feePayment?.status === "succeeded"}
           />
         </div>
       </Card>

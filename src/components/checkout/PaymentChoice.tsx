@@ -46,13 +46,7 @@ export function PaymentChoice({
         <legend className="text-sm font-medium text-ink">Pay with</legend>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              onClick={() => {
-                if (!disabled) onMethodChange(option.value);
-              }}
-              className={disabled ? "cursor-not-allowed" : "cursor-pointer"}
-            >
+            <label key={option.value} className={disabled ? "cursor-not-allowed" : "cursor-pointer"}>
               <input
                 type="radio"
                 name={`${idPrefix}-method`}
