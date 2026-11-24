@@ -10,6 +10,7 @@ import { fetchBusinessTypes, type BusinessType } from "@/lib/business-types";
 import { ROLES, clearSignupDraft, getSignupDraft } from "@/lib/roles";
 import { Card, PageHeader, inputClass } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
+import { PayoutAccountCard } from "../PayoutAccountCard";
 
 export function BusinessProfilePanel() {
   const { role, token, user, profile, profileError, reloadProfile } = useWorkspace();
@@ -332,6 +333,8 @@ export function BusinessProfilePanel() {
           )}
         </Card>
       )}
+
+      {profile && <PayoutAccountCard />}
     </div>
   );
 }

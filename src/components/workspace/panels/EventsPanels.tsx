@@ -23,6 +23,7 @@ import { workspaceHref } from "@/lib/workspace-nav";
 import { Card, PageHeader, inputClass } from "../ui";
 import { ProfileGate } from "../shared";
 import { PosterEditor, PosterUpload } from "../PosterUpload";
+import { PayoutAccountCard } from "../PayoutAccountCard";
 import { useWorkspace } from "../WorkspaceContext";
 
 type Category = "event" | "bus" | "flight" | "tourism";
@@ -290,6 +291,9 @@ function CreateEventForm({
   // Hosted checkout (PayChangu): the payer chooses mobile money or card on the provider's page,
   // so the form skips the method/number fields and uses the existing hosted ("card") flow.
   const [hosted, setHosted] = useState(false);
+  // Ticket money is paid straight to the organiser after each sale, so non-bus listings need a payout account first.
+  const [payoutReady, setPayoutReady] = useState<boolean | null>(null);
+  const needsPayout = !isBus && payoutReady === false;
 
   // Bus-only route details (see formatRouteDetails above).
   const [arrivalTerminal, setArrivalTerminal] = useState("");
@@ -377,6 +381,7 @@ function CreateEventForm({
         const data = new FormData(form);
 
         // Validate everything BEFORE charging anyone.
+        if (needsPayout) return setError("Add your payout account first, so ticket money can be sent to you.");
         const startsAt = new Date(String(data.get("startsAt") || ""));
         if (Number.isNaN(startsAt.getTime())) return setError("Choose a valid start date and time.");
         if (startsAt.getTime() <= Date.now()) return setError("The start time must be in the future, otherwise customers won't see the listing.");
@@ -664,6 +669,12 @@ function CreateEventForm({
         </div>
       </Card>
 
+      {!isBus && (
+        <div className="-mt-8">
+          <PayoutAccountCard onChange={setPayoutReady} />
+        </div>
+      )}
+
       <Card>
         <h2 className="text-sm font-bold text-navy-950">Publishing fee</h2>
         <p className="mt-1 text-sm text-ink-muted">
@@ -723,7 +734,7 @@ function CreateEventForm({
         </p>
       )}
 
-      <Button type="submit" variant="accent" size="lg" disabled={busy} className="w-full sm:w-auto">
+      <Button type="submit" variant="accent" size="lg" disabled={busy || needsPayout} className="w-full sm:w-auto">
         {busy
           ? "Processing…"
           : feePayment

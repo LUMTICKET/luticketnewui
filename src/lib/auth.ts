@@ -560,3 +560,50 @@ export async function publicApiRequest<T>(path: string) {
   if (!response.ok) throw new Error(payload?.message || payload?.error || `Request failed (${response.status}).`);
   return payload as T;
 }
+
+// ---- Payout account: where ticket money is sent right after each sale ------------------------
+
+export type PayoutMethod = "tnm" | "airtel" | "bank";
+
+export interface PayoutDetails {
+  configured: boolean;
+  method: PayoutMethod | null;
+  accountName: string | null;
+  accountNumber: string | null;
+  bankUuid: string | null;
+}
+
+export function getPayoutDetails() {
+  return apiRequest<PayoutDetails>("/api/business/payout-details");
+}
+
+export function savePayoutDetails(payload: {
+  method: PayoutMethod;
+  accountName: string;
+  accountNumber: string;
+  bankUuid?: string;
+}) {
+  return apiRequest<PayoutDetails>("/api/business/payout-details", { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export async function listPayoutBanks() {
+  const r = await apiRequest<{ banks: { uuid: string; name: string }[] }>("/api/business/payout-banks");
+  return r?.banks ?? [];
+}
+
+export interface PayoutRow {
+  id: number;
+  grossAmount: number;
+  commissionRate: string;
+  commissionAmount: number;
+  netAmount: number;
+  currency: string;
+  tier: "small" | "standard" | "premium";
+  status: "pending" | "needs-details" | "sending" | "sent" | "paid" | "failed";
+  createdAt: string;
+}
+
+export async function listPayouts() {
+  const r = await apiRequest<{ payouts: PayoutRow[] }>("/api/finance/payouts");
+  return r?.payouts ?? [];
+}
