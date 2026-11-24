@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { posterSrc } from "@/lib/poster";
 import { listCatalogEvents, type CatalogEvent } from "@/lib/operations";
 import { trendingEvents } from "@/lib/data";
 import { formatEventDate } from "@/lib/format";
@@ -91,6 +92,10 @@ export default async function EventDetailPage(props: PageProps<"/events/[id]">) 
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        {live && posterSrc(live.image) && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={posterSrc(live.image)!} alt={`${event.title} poster`} className="mb-6 max-h-[32rem] w-full max-w-md rounded-2xl border border-line object-cover" />
+        )}
         {event.description && (
           <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
             {event.description}

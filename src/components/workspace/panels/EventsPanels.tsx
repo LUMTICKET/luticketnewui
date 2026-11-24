@@ -22,6 +22,7 @@ import { formatPrice } from "@/lib/format";
 import { workspaceHref } from "@/lib/workspace-nav";
 import { Card, PageHeader, inputClass } from "../ui";
 import { ProfileGate } from "../shared";
+import { PosterEditor, PosterUpload } from "../PosterUpload";
 import { useWorkspace } from "../WorkspaceContext";
 
 type Category = "event" | "bus" | "flight" | "tourism";
@@ -158,6 +159,13 @@ function EventList({
         const minPrice = tickets.length > 0 ? Math.min(...tickets.map((t) => t.price)) : null;
         return (
           <li key={item.id} className="rounded-2xl border border-line bg-surface p-5">
+            <PosterEditor
+              token={token}
+              eventId={item.id}
+              title={item.title}
+              image={item.image}
+              onSaved={(image) => setEvents((prev) => prev && prev.map((e) => (e.id === item.id ? { ...e, image } : e)))}
+            />
             <div className="flex items-start justify-between gap-3">
               <p className="font-semibold text-navy-950">{item.title}</p>
               <Badge tone="neutral">{item.category}</Badge>
@@ -277,6 +285,8 @@ function CreateEventForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Poster / flyer image (resized data URL) shown to customers on the website.
+  const [poster, setPoster] = useState<string | null>(null);
   // Hosted checkout (PayChangu): the payer chooses mobile money or card on the provider's page,
   // so the form skips the method/number fields and uses the existing hosted ("card") flow.
   const [hosted, setHosted] = useState(false);
@@ -474,6 +484,7 @@ function CreateEventForm({
             location: String(data.get("location") || ""),
             startsAt: startsAt.toISOString(),
             maxPerUser: Number(data.get("maxPerUser") || 5),
+            ...(poster ? { image: poster } : {}),
             tags: String(data.get("tags") || "")
               .split(",")
               .map((t) => t.trim())
@@ -489,6 +500,7 @@ function CreateEventForm({
           setDirect(true);
           setStops([{ name: "", eta: "" }]);
           setEstimatedArrival("");
+          setPoster(null);
           form.reset();
         } catch (submitError) {
           const base = submitError instanceof Error ? submitError.message : "Could not publish this listing.";
@@ -622,6 +634,10 @@ function CreateEventForm({
             <textarea id="description" name="description" rows={3} className="mt-1.5 w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:border-navy-400" placeholder={isBus ? "Anything else passengers should know" : "What should people expect?"} />
           </div>
         </div>
+      </Card>
+
+      <Card>
+        <PosterUpload value={poster} onChange={setPoster} disabled={busy} />
       </Card>
 
       <Card>

@@ -332,6 +332,8 @@ export interface CreateEventInput {
   startsAt: string;
   maxPerUser?: number;
   tags?: string[];
+  /** Poster / flyer as a JPEG/PNG/WebP data URL (see src/lib/poster.ts). */
+  image?: string;
   tickets: TicketTierInput[];
 }
 
@@ -339,6 +341,14 @@ export function createEventListing(token: string, payload: CreateEventInput) {
   return authorizedRequest<EventSummary>("/api/events", token, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+/** Add, replace (data URL) or remove (null) the poster of an already-published listing. */
+export function updateEventPoster(token: string, id: number | string, image: string | null) {
+  return authorizedRequest<EventSummary>(`/api/events/${id}`, token, {
+    method: "PUT",
+    body: JSON.stringify({ image }),
   });
 }
 

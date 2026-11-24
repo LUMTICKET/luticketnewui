@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { SearchBand } from "@/components/search/SearchBand";
 import { ModuleSearchBar } from "@/components/search/ModuleSearchBar";
 import Link from "next/link";
+import { posterSrc } from "@/lib/poster";
 
 export const metadata = {
   title: "Events — Lumticket",
@@ -27,6 +28,7 @@ interface DisplayEvent {
   fromPrice: number;
   currency: string;
   status: "on-sale" | "selling-fast" | "sold-out";
+  image?: string | null;
 }
 
 function fromApi(event: CatalogEvent): DisplayEvent {
@@ -41,6 +43,7 @@ function fromApi(event: CatalogEvent): DisplayEvent {
     fromPrice: event.fromPrice,
     currency: event.currency,
     status: event.status,
+    image: posterSrc(event.image),
   };
 }
 
@@ -108,11 +111,16 @@ export default async function EventsPage(props: PageProps<"/events">) {
               href={`/events/${event.id}`}
               className="flex flex-col overflow-hidden rounded-2xl border border-line transition-shadow hover:shadow-lg hover:shadow-navy-950/5"
             >
-              <div className="flex h-28 items-center justify-center bg-navy-950">
-                <span className="text-xs font-semibold uppercase tracking-widest text-gold-400">
-                  {event.category}
-                </span>
-              </div>
+              {"image" in event && event.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={event.image} alt={`${event.title} poster`} className="h-56 w-full object-cover" loading="lazy" />
+              ) : (
+                <div className="flex h-28 items-center justify-center bg-navy-950">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gold-400">
+                    {event.category}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-1 flex-col p-4">
                 <Badge tone={statusTone[event.status]}>
                   {event.status.replace("-", " ")}
