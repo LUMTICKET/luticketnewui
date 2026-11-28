@@ -236,6 +236,13 @@ export interface PaymentRecord {
   currency?: string;
   status?: string;
   paidAt?: string;
+  /** Server-classified payment purpose; never infer publishing fees from all successful payments. */
+  paymentType?: "ticket-purchase" | "publishing-fee" | "other";
+  metadata?: {
+    paymentType?: string;
+    intent?: { kind?: string; eventId?: number | string; quantity?: number };
+    [key: string]: unknown;
+  };
   /** Set when the payer finishes on PayChangu's secure page (card, or hosted mobile money). */
   checkoutUrl?: string;
   [key: string]: unknown;

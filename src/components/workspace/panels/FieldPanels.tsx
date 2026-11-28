@@ -22,7 +22,7 @@ import {
   type Settlement,
   type TillSummary,
 } from "@/lib/operations";
-import { listEvents, getEvent, type EventSummary } from "@/lib/auth";
+import { listEvents, getEvent, listPayments, type EventSummary, type PaymentRecord } from "@/lib/auth";
 import { Card, PageHeader, StatCard, TableShell, THead, cell, inputClass, rowClass } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
 
@@ -296,14 +296,16 @@ export function OrganizerReportsPanel() {
   const [events, setEvents] = useState<EventSummary[] | null>(null);
   const [details, setDetails] = useState<Record<string, Awaited<ReturnType<typeof getEvent>>>>({});
   const [error, setError] = useState("");
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
   useEffect(() => {
     if (!profile) return;
     let cancelled = false;
-    listEvents(token, profile.id)
-      .then(async (all) => {
+    Promise.all([listEvents(token, profile.id), listPayments(token, profile.id)])
+      .then(async ([all, paymentRows]) => {
         if (cancelled) return;
         setEvents(all);
+        setPayments(paymentRows);
         const loaded: Record<string, Awaited<ReturnType<typeof getEvent>>> = {};
         await Promise.all(
           all.map(async (event) => {
@@ -311,7 +313,7 @@ export function OrganizerReportsPanel() {
               const detail = await getEvent(token, event.id);
               if (detail) loaded[String(event.id)] = detail;
             } catch {
-              // A missing detail just skips that listing's stats.
+              // A missing detail just skips that listing's capacity stats.
             }
           }),
         );
@@ -331,15 +333,20 @@ export function OrganizerReportsPanel() {
   const rows = useMemo(() => {
     return (events ?? []).map((event) => {
       const tickets = details[String(event.id)]?.tickets ?? [];
-      const sold = tickets.reduce((sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0), 0);
       const capacity = tickets.reduce((sum, t) => sum + (t.capacity ?? 0), 0);
-      const gross = tickets.reduce(
-        (sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0) * (t.price ?? 0),
-        0,
+      const paid = payments.filter((payment) =>
+        payment.status === "succeeded" &&
+        payment.paymentType === "ticket-purchase" &&
+        String(payment.metadata?.intent?.eventId ?? "") === String(event.id),
       );
-      return { id: event.id, title: event.title, sold, capacity, gross, currency: tickets[0]?.currency ?? "MWK" };
+      const sold = paid.reduce((sum, payment) => {
+        const quantity = Number(payment.metadata?.intent?.quantity ?? 1);
+        return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+      }, 0);
+      const gross = paid.reduce((sum, payment) => sum + (typeof payment.amount === "number" ? payment.amount : 0), 0);
+      return { id: event.id, title: event.title, sold, capacity, gross, currency: paid[0]?.currency ?? tickets[0]?.currency ?? "MWK" };
     });
-  }, [events, details]);
+  }, [events, details, payments]);
 
   return (
     <div>

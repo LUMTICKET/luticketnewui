@@ -140,17 +140,20 @@ export function WorkspaceOverview() {
   const kpis = useMemo(() => {
     if (!profile) return content.kpis;
 
-    // Per-ticket sold/capacity comes from each listing's ticket rows.
+    // Only verified customer ticket payments count as presales. Publishing-fee
+    // payments are a separate revenue stream and must never inflate ticket sales.
     const ticketRows = Object.values(data.details).flatMap((detail) => detail.tickets ?? []);
-    const sold = ticketRows.reduce((sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0), 0);
     const capacity = ticketRows.reduce((sum, t) => sum + (t.capacity ?? 0), 0);
-    const gross = ticketRows.reduce(
-      (sum, t) => sum + Math.max((t.capacity ?? 0) - (t.remaining ?? 0), 0) * (t.price ?? 0),
-      0,
-    );
-    const currency = ticketRows[0]?.currency ?? "MWK";
     const succeeded = data.payments.filter((p) => p.status === "succeeded");
-    const feesTotal = succeeded.reduce((sum, p) => sum + (typeof p.amount === "number" ? p.amount : 0), 0);
+    const ticketPayments = succeeded.filter((p) => p.paymentType === "ticket-purchase");
+    const publishingPayments = succeeded.filter((p) => p.paymentType === "publishing-fee");
+    const sold = ticketPayments.reduce((sum, p) => {
+      const quantity = Number(p.metadata?.intent?.quantity ?? 1);
+      return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+    }, 0);
+    const gross = ticketPayments.reduce((sum, p) => sum + (typeof p.amount === "number" ? p.amount : 0), 0);
+    const currency = ticketPayments[0]?.currency ?? publishingPayments[0]?.currency ?? ticketRows[0]?.currency ?? "MWK";
+    const feesTotal = publishingPayments.reduce((sum, p) => sum + (typeof p.amount === "number" ? p.amount : 0), 0);
     const pendingInvites = data.invitations.filter((i) => i.status === "pending").length;
 
     return [
@@ -167,7 +170,7 @@ export function WorkspaceOverview() {
       {
         label: "Publishing fees paid",
         value: feesTotal > 0 ? formatPrice(feesTotal, currency) : "—",
-        hint: `${succeeded.length} successful payment${succeeded.length === 1 ? "" : "s"}`},
+        hint: `${publishingPayments.length} successful publishing-fee payment${publishingPayments.length === 1 ? "" : "s"}`},
       {
         label: "Team invites",
         value: `${pendingInvites} pending`,
