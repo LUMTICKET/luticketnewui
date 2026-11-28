@@ -25,6 +25,7 @@ import {
 import { listEvents, getEvent, listPayments, type EventSummary, type PaymentRecord } from "@/lib/auth";
 import { Card, PageHeader, StatCard, TableShell, THead, cell, inputClass, rowClass } from "../ui";
 import { useWorkspace } from "../WorkspaceContext";
+import { FinanceChart, type FinanceSeries } from "../FinanceChart";
 
 // ---------------------------------------------------------------------------
 // Shared load wrapper
@@ -207,19 +208,35 @@ export function ScanPanel({
 // ---------------------------------------------------------------------------
 // Finance & settlements (operator view)
 // ---------------------------------------------------------------------------
+// Lumticket brand colours for the finance graph (navy + gold, see globals.css).
+const FINANCE_COLORS = { revenue: "#042045", commission: "#cc9f2f", fees: "#5a83bc" } as const;
+const RANGES = [7, 30, 90] as const;
+
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 export function FinancePanel() {
-  const { profile } = useWorkspace();
+  const { token, profile } = useWorkspace();
   const [finance, setFinance] = useState<FinanceSnapshot | null>(null);
+  const [feePayments, setFeePayments] = useState<PaymentRecord[]>([]);
+  const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const profileId = profile?.id;
 
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
       try {
-        const snapshot = await getFinanceSnapshot();
+        const [snapshot, payments] = await Promise.all([
+          getFinanceSnapshot(),
+          // Publishing fees come from the payments list; a failure here must not hide the sales figures.
+          profileId ? listPayments(token, profileId).catch(() => [] as PaymentRecord[]) : Promise.resolve([] as PaymentRecord[]),
+        ]);
         if (!cancelled) {
           setFinance(snapshot);
+          setFeePayments(payments.filter((p) => p.paymentType === "publishing-fee" && p.status === "succeeded"));
           setUpdatedAt(snapshot.generatedAt ?? new Date().toISOString());
           setError("");
         }
@@ -230,7 +247,37 @@ export function FinancePanel() {
     void refresh();
     const interval = window.setInterval(() => void refresh(), 15000);
     return () => { cancelled = true; window.clearInterval(interval); };
-  }, []);
+  }, [token, profileId]);
+
+  // Daily totals for the chart: revenue (gross ticket sales), commission paid to Lumticket, publishing fees paid.
+  const chart = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days = Array.from({ length: range }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() - (range - 1 - i)));
+    const first = days[0].getTime();
+    const bucket = (value: unknown) => {
+      const d = new Date(String(value ?? ""));
+      if (Number.isNaN(d.getTime())) return -1;
+      const i = Math.round((startOfDay(d).getTime() - first) / 86_400_000);
+      return i >= 0 && i < range ? i : -1;
+    };
+    const revenue = new Array<number>(range).fill(0);
+    const commission = new Array<number>(range).fill(0);
+    const fees = new Array<number>(range).fill(0);
+    for (const row of finance?.payouts ?? []) {
+      const i = bucket(row.createdAt);
+      if (i >= 0) { revenue[i] += row.grossAmount; commission[i] += row.commissionPaidToPlatform ?? row.commissionAmount; }
+    }
+    for (const payment of feePayments) {
+      const i = bucket(payment.paidAt ?? payment.createdAt);
+      if (i >= 0) fees[i] += Number(payment.amount ?? 0);
+    }
+    const series: FinanceSeries[] = [
+      { key: "revenue", label: "Revenue", color: FINANCE_COLORS.revenue, values: revenue },
+      { key: "commission", label: "Commission paid to Lumticket", color: FINANCE_COLORS.commission, dash: "7 5", values: commission },
+      { key: "fees", label: "Publishing fees paid", color: FINANCE_COLORS.fees, dash: "2 5", values: fees },
+    ];
+    return { days, series };
+  }, [finance, feePayments, range]);
 
   const live = finance?.live ?? { grossSales: 0, commissionPaidToPlatform: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 };
   const currency = finance?.payouts[0]?.currency ?? finance?.settlements[0]?.currency ?? "MWK";
@@ -246,6 +293,39 @@ export function FinancePanel() {
         <span>Auto-refreshes every 15 seconds</span>
         <span>{updatedAt ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}` : "Loading live figures…"}</span>
       </div>
+      <Card className="mt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-navy-950">Revenue, commission &amp; publishing fees</h2>
+            <p className="text-xs text-ink-muted">Daily totals · last {range} days</p>
+          </div>
+          <div role="group" aria-label="Chart period" className="flex rounded-lg border border-line p-0.5">
+            {RANGES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                aria-pressed={range === r}
+                onClick={() => setRange(r)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition ${range === r ? "bg-navy-950 text-white" : "text-ink-muted hover:text-navy-950"}`}
+              >
+                {r}d
+              </button>
+            ))}
+          </div>
+        </div>
+        <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-muted">
+          {chart.series.map((s) => (
+            <li key={s.key} className="flex items-center gap-2">
+              <svg width="26" height="8" aria-hidden="true"><line x1="1" x2="25" y1="4" y2="4" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeDasharray={s.dash} /></svg>
+              <span>{s.label}</span>
+              <span className="font-semibold text-navy-950">{formatPrice(s.values.reduce((a, v) => a + v, 0), currency)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3">
+          {!finance ? <Loading /> : <FinanceChart days={chart.days} series={chart.series} currency={currency} />}
+        </div>
+      </Card>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Gross sales" value={formatPrice(live.grossSales, currency)} />
         <StatCard label="Commission paid to Lumticket" value={formatPrice(live.commissionPaidToPlatform ?? live.commissionEarned, currency)} hint="Platform commission deducted from your ticket sales" />
