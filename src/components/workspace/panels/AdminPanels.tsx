@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { formatPrice } from "@/lib/format";
 import {
   getParcelTracking,
+  getPlatformEarnings,
   listKycQueue,
   listPlatformAudit,
   listPlatformOperators,
@@ -24,6 +25,7 @@ import {
   upsertCommissionRule,
   type CommissionRule,
   type KycQueueItem,
+  type PlatformEarnings,
   type PlatformAuditEntry,
   type PlatformOperator,
   type PlatformRole,
@@ -252,6 +254,16 @@ export function CommissionPanel() {
   const { items: rules, setItems, error, setError, reload } = useApiList(listCommissionRules);
   const [busy, setBusy] = useState(false);
   const [savedService, setSavedService] = useState<string | null>(null);
+  const [earnings, setEarnings] = useState<PlatformEarnings | null>(null);
+
+  // Money that belongs to Lumticket (the system owners): commission paid on ticket sales + publishing fees.
+  useEffect(() => {
+    let cancelled = false;
+    getPlatformEarnings()
+      .then((loaded) => { if (!cancelled) setEarnings(loaded); })
+      .catch(() => { /* the rates below still work without the totals */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const serviceLabels: Record<string, string> = {
     bus: "Bus tickets",
@@ -283,6 +295,13 @@ export function CommissionPanel() {
         description="Platform-wide commission per service. Changes apply immediately — every upsert is recorded in the platform audit log."
       />
       <ErrorNotice message={error} onRetry={reload} />
+      {earnings && (
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Commission paid to Lumticket" value={formatPrice(earnings.platformCommission, "MWK")} hint="Kept by the platform from ticket sales" />
+          <StatCard label="Publishing fees collected" value={formatPrice(earnings.publishingFees, "MWK")} hint="Listing and republish fees" />
+          <StatCard label="Total platform revenue" value={formatPrice(earnings.platformRevenue, "MWK")} featured />
+        </div>
+      )}
       {rules === null ? (
         <Loading />
       ) : (

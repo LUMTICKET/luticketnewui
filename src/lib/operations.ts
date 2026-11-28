@@ -609,7 +609,9 @@ export async function listSettlements(status?: "pending" | "paid") {
 export interface LivePayoutRow {
   id: number | string;
   grossAmount: number;
+  /** Commission the organiser paid to Lumticket (the platform owners) on this sale. */
   commissionAmount: number;
+  commissionPaidToPlatform?: number;
   netAmount: number;
   currency: string;
   status: string;
@@ -621,7 +623,7 @@ export interface LivePayoutRow {
 export interface FinanceSnapshot {
   settlements: Settlement[];
   payouts: LivePayoutRow[];
-  live: { grossSales: number; commissionEarned: number; publishingFeesPaid: number; netPayouts: number; pendingPayouts: number };
+  live: { grossSales: number; commissionPaidToPlatform?: number; commissionEarned: number; publishingFeesPaid: number; netPayouts: number; pendingPayouts: number };
   generatedAt?: string;
 }
 
@@ -630,8 +632,32 @@ export async function getFinanceSnapshot(): Promise<FinanceSnapshot> {
   return {
     settlements: Array.isArray(response?.settlements) ? response.settlements : [],
     payouts: Array.isArray(response?.payouts) ? response.payouts : [],
-    live: response?.live ?? { grossSales: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 },
+    live: response?.live ?? { grossSales: 0, commissionPaidToPlatform: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 },
     generatedAt: response?.generatedAt,
+  };
+}
+
+/** What Lumticket (the system owners) has earned: commission paid on ticket sales + publishing fees. */
+export interface PlatformEarnings {
+  platformCommission: number;
+  publishingFees: number;
+  platformRevenue: number;
+  grossTicketSales: number;
+  openPayouts: number;
+}
+
+export async function getPlatformEarnings(): Promise<PlatformEarnings> {
+  const response = await apiRequest<{ totals?: Record<string, unknown> }>("/api/admin/payouts");
+  const t = response?.totals ?? {};
+  const n = (value: unknown) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+  const platformCommission = n(t.platformCommission ?? t.commission);
+  const publishingFees = n(t.publishingFees);
+  return {
+    platformCommission,
+    publishingFees,
+    platformRevenue: n(t.platformRevenue) || platformCommission + publishingFees,
+    grossTicketSales: n(t.gross),
+    openPayouts: n(t.open),
   };
 }
 

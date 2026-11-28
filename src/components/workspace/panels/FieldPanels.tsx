@@ -232,14 +232,14 @@ export function FinancePanel() {
     return () => { cancelled = true; window.clearInterval(interval); };
   }, []);
 
-  const live = finance?.live ?? { grossSales: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 };
+  const live = finance?.live ?? { grossSales: 0, commissionPaidToPlatform: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 };
   const currency = finance?.payouts[0]?.currency ?? finance?.settlements[0]?.currency ?? "MWK";
 
   return (
     <div>
       <PageHeader
         title="Finance & settlements"
-        description="Live ticket-payment settlements. Gross sales and platform commission come only from verified customer ticket purchases; publishing fees are displayed separately."
+        description="Live ticket-payment settlements. Gross sales and the commission you pay to Lumticket come only from verified customer ticket purchases; publishing fees are displayed separately."
       />
       <ErrorNotice message={error} />
       <div className="mt-3 flex items-center justify-between text-xs text-ink-faint">
@@ -248,7 +248,7 @@ export function FinancePanel() {
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Gross sales" value={formatPrice(live.grossSales, currency)} />
-        <StatCard label="Commission earned" value={formatPrice(live.commissionEarned, currency)} />
+        <StatCard label="Commission paid to Lumticket" value={formatPrice(live.commissionPaidToPlatform ?? live.commissionEarned, currency)} hint="Platform commission deducted from your ticket sales" />
         <StatCard label="Publishing fees paid" value={formatPrice(live.publishingFeesPaid, currency)} />
         <StatCard label="Net payouts" value={formatPrice(live.netPayouts, currency)} />
         <StatCard label="Pending payouts" value={live.pendingPayouts} tone={live.pendingPayouts ? "warning" : "default"} />
@@ -256,7 +256,7 @@ export function FinancePanel() {
       <div className="mt-6">
         {!finance ? <Loading /> : (
           <TableShell>
-            <THead columns={["Account", "Date", "Gross sales", "Commission earned", "Net payout", "Payout status"]} />
+            <THead columns={["Account", "Date", "Gross sales", "Commission paid to Lumticket", "Net payout to you", "Payout status"]} />
             <tbody>
               {finance.payouts.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No successful ticket sales yet. Verified customer payments will appear here automatically.</td></tr>

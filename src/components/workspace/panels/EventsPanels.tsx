@@ -181,7 +181,7 @@ function EventList({
     setSaving(true); setActionMessage("");
     try {
       const result = await deleteEventListing(token, item.id);
-      if (!result) throw new Error("The server did not confirm the delete request.");
+      if (!result) throw new Error("This event could not be found. It may already have been removed; refresh the page to see your latest listings.");
       setActionMessage(result.message ?? (result.deleted ? "Event deleted." : "Event updated."));
       setEvents((prev) => prev?.filter((e) => e.id !== item.id) ?? null);
     } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not delete this event."); }
@@ -201,24 +201,35 @@ function EventList({
 
   async function payAndRepublish(item: EventSummary) {
     if (!editTitle.trim() || !editLocation.trim() || !editDate) { setActionMessage("Title, location and event date are required."); return; }
-    if (method !== "card" && !phone.trim()) { setActionMessage("Enter the mobile money number for the selected payment method."); return; }
+    if (method !== "card" && !phone.trim() && !pendingPaymentId) { setActionMessage("Enter the mobile money number for the selected payment method."); return; }
     setSaving(true); setActionMessage("");
     try {
       let paymentId = pendingPaymentId;
+      let hostedCheckout = Boolean(checkoutUrl);
       if (!paymentId) {
         const payment = await startPublishingPayment(token, { businessProfileId: profileId, method, phone: method === "card" ? undefined : phone, description: `Republish event: ${editTitle}` });
-        if (!payment) throw new Error("Could not start the publishing-fee payment.");
+        if (!payment) throw new Error("PayChangu could not start the payment right now. You have not been charged. Please try again in a moment.");
         paymentId = payment.id;
         setPendingPaymentId(payment.id);
         if (payment.checkoutUrl) {
+          hostedCheckout = true;
           setCheckoutUrl(payment.checkoutUrl);
-          setActionMessage("Complete payment in the secure PayChangu page, then select Verify payment & republish.");
+          // Open PayChangu's secure page; if the browser blocks the pop-up the link below the button still works.
+          if (typeof window !== "undefined") window.open(payment.checkoutUrl, "_blank", "noopener,noreferrer");
+          setActionMessage("Complete the payment on the secure PayChangu page, then come back and select Verify payment & republish.");
           setSaving(false);
           return;
         }
+        setActionMessage("Approve the payment prompt on your phone. We will republish the event as soon as PayChangu confirms it.");
       }
-      const status = await waitForPayment(token, profileId, paymentId, { timeoutMs: 180000, intervalMs: 3000 });
-      if (status !== "succeeded") { setActionMessage(status === "timeout" ? "Payment is still pending. You can verify again without paying twice." : `Payment ${status}. Please start a new payment if needed.`); if (status !== "timeout") setPendingPaymentId(null); return; }
+      // Mobile money: wait for the PIN approval. Hosted page: the payer has already been there, so only a short check is needed.
+      const status = await waitForPayment(token, profileId, paymentId, { timeoutMs: hostedCheckout ? 30000 : 180000, intervalMs: hostedCheckout ? 2000 : 3000 });
+      if (status !== "succeeded") {
+        if (status === "timeout") { setActionMessage(hostedCheckout ? "PayChangu has not confirmed the payment yet. If you have just paid, wait a few seconds and select Verify payment & republish again. You will not be charged twice." : "Still waiting for PayChangu to confirm the payment. Select Verify payment & republish to check again. You will not be charged twice."); return; }
+        setActionMessage(`The payment ${status === "failed" ? "did not go through" : "was reversed"}. Select Pay publishing fee & republish to try again.`);
+        setPendingPaymentId(null); setCheckoutUrl("");
+        return;
+      }
       const updated = await republishEvent(token, item.id, {
         paymentId,
         title: editTitle.trim(),
@@ -227,12 +238,14 @@ function EventList({
         startsAt: new Date(editDate).toISOString(),
         tickets: editTickets.map((t) => ({ ...t, price: Number(t.price), capacity: Number(t.capacity) })),
       });
-      if (!updated) throw new Error("Payment succeeded but the event update was not confirmed. Contact support before trying another payment.");
-      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, title: updated.title, location: updated.location, startsAt: updated.startsAt } : e) ?? null);
+      // The API only answers "not found" here when the event itself is gone; the fee stays valid for this business.
+      if (!updated) throw new Error("This event could not be found any more, so nothing was republished. Your publishing-fee payment is safe: refresh the page and try again.");
+      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, title: updated.title, location: updated.location, startsAt: updated.startsAt, status: updated.status } : e) ?? null);
       setDetails((prev) => ({ ...prev, [String(item.id)]: updated }));
-      setActionMessage("Publishing fee verified. Event and ticket information republished successfully.");
+      setActionMessage("Publishing fee confirmed by PayChangu. Your event and ticket information are live again.");
+      setPendingPaymentId(null); setCheckoutUrl("");
       setEditingId(null);
-    } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not republish this event."); }
+    } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not republish this event. Your payment is safe; select Verify payment & republish to try again."); }
     finally { setSaving(false); }
   }
 
