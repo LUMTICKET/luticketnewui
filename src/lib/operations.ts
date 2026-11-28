@@ -605,6 +605,36 @@ export async function listSettlements(status?: "pending" | "paid") {
   );
 }
 
+
+export interface LivePayoutRow {
+  id: number | string;
+  grossAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+  currency: string;
+  status: string;
+  createdAt?: string;
+  sentAt?: string | null;
+  eventId?: number | null;
+}
+
+export interface FinanceSnapshot {
+  settlements: Settlement[];
+  payouts: LivePayoutRow[];
+  live: { grossSales: number; commissionEarned: number; publishingFeesPaid: number; netPayouts: number; pendingPayouts: number };
+  generatedAt?: string;
+}
+
+export async function getFinanceSnapshot(): Promise<FinanceSnapshot> {
+  const response = await apiRequest<FinanceSnapshot>("/api/finance/settlements");
+  return {
+    settlements: Array.isArray(response?.settlements) ? response.settlements : [],
+    payouts: Array.isArray(response?.payouts) ? response.payouts : [],
+    live: response?.live ?? { grossSales: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 },
+    generatedAt: response?.generatedAt,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Platform administration
 // ---------------------------------------------------------------------------

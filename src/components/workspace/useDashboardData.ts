@@ -106,8 +106,10 @@ export function useDashboardData(
       setLoading(false);
     })();
 
+    const refreshInterval = window.setInterval(() => setNonce((n) => n + 1), 15000);
     return () => {
       cancelled = true;
+      window.clearInterval(refreshInterval);
     };
   }, [token, businessProfileId, nonce]);
 

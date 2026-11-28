@@ -217,6 +217,7 @@ export interface EventTicketTypeRow {
   currency: string;
   capacity: number;
   remaining: number;
+  perks?: string[];
 }
 
 export interface EventDetail extends EventSummary {
@@ -357,6 +358,30 @@ export function updateEventPoster(token: string, id: number | string, image: str
     method: "PUT",
     body: JSON.stringify({ image }),
   });
+}
+
+/** Extend an event date without republishing or charging a fee. */
+export function extendEventDate(token: string, id: number | string, payload: { startsAt?: string; endsAt?: string | null }) {
+  return authorizedRequest<EventDetail>(`/api/events/${id}`, token, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export interface RepublishEventInput {
+  paymentId: number | string;
+  title?: string;
+  location?: string;
+  description?: string | null;
+  startsAt?: string;
+  endsAt?: string | null;
+  tickets?: (TicketTierInput & { id?: number | string })[];
+}
+
+/** Content/ticket changes are published only after the server verifies a new publishing-fee payment. */
+export function republishEvent(token: string, id: number | string, payload: RepublishEventInput) {
+  return authorizedRequest<EventDetail>(`/api/events/${id}/republish`, token, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function deleteEventListing(token: string, id: number | string) {
+  return authorizedRequest<{ success: boolean; deleted?: boolean; cancelled?: boolean; message?: string }>(`/api/events/${id}`, token, { method: "DELETE" });
 }
 
 export interface TeamRole {

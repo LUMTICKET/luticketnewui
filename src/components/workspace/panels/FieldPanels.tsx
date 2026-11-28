@@ -14,12 +14,12 @@ import {
   listCatalogEvents,
   listCatalogRoutes,
   listPosTransactions,
-  listSettlements,
+  getFinanceSnapshot,
   listValidations,
   openTill,
   resolveValidation,
   type PosTransaction,
-  type Settlement,
+  type FinanceSnapshot,
   type TillSummary,
 } from "@/lib/operations";
 import { listEvents, getEvent, listPayments, type EventSummary, type PaymentRecord } from "@/lib/auth";
@@ -209,75 +209,66 @@ export function ScanPanel({
 // ---------------------------------------------------------------------------
 export function FinancePanel() {
   const { profile } = useWorkspace();
-  const { items: settlements, error } = useApiList(listSettlements);
+  const [finance, setFinance] = useState<FinanceSnapshot | null>(null);
+  const [error, setError] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
-  const totals = useMemo(() => {
-    const rows = settlements ?? [];
-    const gross = rows.reduce((sum, s) => sum + (s.grossAmount ?? 0), 0);
-    const commission = rows.reduce((sum, s) => sum + (s.commissionAmount ?? 0), 0);
-    const net = rows.reduce((sum, s) => sum + (s.netAmount ?? 0), 0);
-    return { gross, commission, net, pending: rows.filter((s) => s.status === "pending").length };
-  }, [settlements]);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const snapshot = await getFinanceSnapshot();
+        if (!cancelled) {
+          setFinance(snapshot);
+          setUpdatedAt(snapshot.generatedAt ?? new Date().toISOString());
+          setError("");
+        }
+      } catch (requestError) {
+        if (!cancelled) setError(requestError instanceof Error ? requestError.message : "Could not load live financial data.");
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 15000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, []);
 
-  const currency = (settlements ?? [])[0]?.currency ?? "MWK";
+  const live = finance?.live ?? { grossSales: 0, commissionEarned: 0, publishingFeesPaid: 0, netPayouts: 0, pendingPayouts: 0 };
+  const currency = finance?.payouts[0]?.currency ?? finance?.settlements[0]?.currency ?? "MWK";
 
   return (
     <div>
       <PageHeader
         title="Finance & settlements"
-        description="Every payment is split automatically between you, the platform commission and gateway fees, then paid out to your verified account."
+        description="Live ticket-payment settlements. Gross sales and platform commission come only from verified customer ticket purchases; publishing fees are displayed separately."
       />
-
       <ErrorNotice message={error} />
-
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Gross sales" value={formatPrice(totals.gross, currency)} />
-        <StatCard label="Platform commission" value={formatPrice(totals.commission, currency)} />
-        <StatCard label="Net payouts" value={formatPrice(totals.net, currency)} />
-        <StatCard
-          label="Pending payouts"
-          value={totals.pending}
-          tone={totals.pending ? "warning" : "default"}
-        />
+      <div className="mt-3 flex items-center justify-between text-xs text-ink-faint">
+        <span>Auto-refreshes every 15 seconds</span>
+        <span>{updatedAt ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}` : "Loading live figures…"}</span>
       </div>
-
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="Gross sales" value={formatPrice(live.grossSales, currency)} />
+        <StatCard label="Commission earned" value={formatPrice(live.commissionEarned, currency)} />
+        <StatCard label="Publishing fees paid" value={formatPrice(live.publishingFeesPaid, currency)} />
+        <StatCard label="Net payouts" value={formatPrice(live.netPayouts, currency)} />
+        <StatCard label="Pending payouts" value={live.pendingPayouts} tone={live.pendingPayouts ? "warning" : "default"} />
+      </div>
       <div className="mt-6">
-        {settlements === null ? (
-          <Loading />
-        ) : (
+        {!finance ? <Loading /> : (
           <TableShell>
-            <THead columns={["Account", "Period", "Gross", "Commission", "Net payout", "Status"]} />
+            <THead columns={["Account", "Date", "Gross sales", "Commission earned", "Net payout", "Payout status"]} />
             <tbody>
-              {settlements.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-ink-muted">
-                    No settlements recorded yet — they appear here after your first payout cycle.
-                  </td>
-                </tr>
+              {finance.payouts.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No successful ticket sales yet. Verified customer payments will appear here automatically.</td></tr>
               )}
-              {settlements.map((row: Settlement) => (
+              {finance.payouts.map((row) => (
                 <tr key={row.id} className={rowClass}>
-                  <td className={`${cell} font-medium text-navy-950`}>
-                    {profile?.businessName || "Your business"}
-                  </td>
-                  <td className={`${cell} text-ink-muted`}>
-                    {row.periodStart && row.periodEnd
-                      ? `${row.periodStart.slice(0, 10)} → ${row.periodEnd.slice(0, 10)}`
-                      : "—"}
-                  </td>
-                  <td className={`${cell} text-ink-muted`}>{formatPrice(row.grossAmount ?? 0, row.currency ?? "MWK")}</td>
-                  <td className={`${cell} text-ink-muted`}>
-                    {formatPrice(row.commissionAmount ?? 0, row.currency ?? "MWK")}
-                  </td>
-                  <td className={`${cell} font-semibold text-navy-950`}>
-                    {formatPrice(row.netAmount ?? 0, row.currency ?? "MWK")}
-                  </td>
-                  <td className={cell}>
-                    <Badge tone={row.status === "paid" ? "success" : "warning"}>{row.status}</Badge>
-                    {row.paidAt && (
-                      <p className="mt-1 text-xs text-ink-faint">Paid {row.paidAt.slice(0, 10)}</p>
-                    )}
-                  </td>
+                  <td className={`${cell} font-medium text-navy-950`}>{profile?.businessName || "Your business"}</td>
+                  <td className={`${cell} text-ink-muted`}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : "—"}</td>
+                  <td className={`${cell} text-ink-muted`}>{formatPrice(row.grossAmount, row.currency || currency)}</td>
+                  <td className={`${cell} text-ink-muted`}>{formatPrice(row.commissionAmount, row.currency || currency)}</td>
+                  <td className={`${cell} font-semibold text-navy-950`}>{formatPrice(row.netAmount, row.currency || currency)}</td>
+                  <td className={cell}><Badge tone={["sent", "paid"].includes(row.status) ? "success" : row.status === "failed" ? "error" : "warning"}>{row.status}</Badge></td>
                 </tr>
               ))}
             </tbody>

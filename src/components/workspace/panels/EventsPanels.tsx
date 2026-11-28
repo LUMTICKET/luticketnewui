@@ -9,14 +9,18 @@ import { Badge } from "@/components/ui/Badge";
 import {
   ApiError,
   createEventListing,
+  deleteEventListing,
+  extendEventDate,
   getEvent,
   getPublishingFee,
   listEvents,
   startPublishingPayment,
+  republishEvent,
   waitForPayment,
   type EventSummary,
   type PaymentMethod,
   type TicketTierInput,
+  type EventTicketTypeRow,
 } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 import { workspaceHref } from "@/lib/workspace-nav";
@@ -91,6 +95,14 @@ export function EventsPanel({
   );
 }
 
+function toLocalDateTime(value: string | Date | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function EventList({
   token,
   profileId,
@@ -107,6 +119,19 @@ function EventList({
   const [events, setEvents] = useState<EventSummary[] | null>(null);
   const [details, setDetails] = useState<Record<string, Awaited<ReturnType<typeof getEvent>>>>({});
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTickets, setEditTickets] = useState<(TicketTierInput & { id?: number | string })[]>([]);
+  const [method, setMethod] = useState<PaymentMethod>("tnm");
+  const [phone, setPhone] = useState("");
+  const [pendingPaymentId, setPendingPaymentId] = useState<number | string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [publishingFee, setPublishingFee] = useState<{ amount: number; currency: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +161,80 @@ function EventList({
       cancelled = true;
     };
   }, [token, profileId, category]);
+
+  async function openEditor(item: EventSummary) {
+    setEditingId(item.id);
+    setActionMessage("");
+    setPendingPaymentId(null);
+    setCheckoutUrl("");
+    setEditTitle(item.title);
+    setEditLocation(item.location);
+    setEditDescription(String(item.description ?? details[String(item.id)]?.description ?? ""));
+    setEditDate(toLocalDateTime(item.startsAt));
+    const current = details[String(item.id)]?.tickets ?? [];
+    setEditTickets(current.map((t: EventTicketTypeRow) => ({ id: t.id, name: t.name, price: t.price, currency: t.currency, capacity: t.capacity, perks: t.perks ?? [] })));
+    try { setPublishingFee(await getPublishingFee()); } catch { setPublishingFee(null); }
+  }
+
+  async function removeEvent(item: EventSummary) {
+    if (!window.confirm(`Delete "${item.title}"? Events with paid tickets will be cancelled to protect customer and financial records.`)) return;
+    setSaving(true); setActionMessage("");
+    try {
+      const result = await deleteEventListing(token, item.id);
+      if (!result) throw new Error("The server did not confirm the delete request.");
+      setActionMessage(result.message ?? (result.deleted ? "Event deleted." : "Event updated."));
+      setEvents((prev) => prev?.filter((e) => e.id !== item.id));
+    } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not delete this event."); }
+    finally { setSaving(false); }
+  }
+
+  async function extendDate(item: EventSummary) {
+    if (!editDate) { setActionMessage("Choose the new event date first."); return; }
+    setSaving(true); setActionMessage("");
+    try {
+      await extendEventDate(token, item.id, { startsAt: new Date(editDate).toISOString() });
+      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, startsAt: new Date(editDate).toISOString() } : e));
+      setActionMessage("Event date extended successfully. No publishing fee was charged.");
+    } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not extend the date."); }
+    finally { setSaving(false); }
+  }
+
+  async function payAndRepublish(item: EventSummary) {
+    if (!editTitle.trim() || !editLocation.trim() || !editDate) { setActionMessage("Title, location and event date are required."); return; }
+    if (method !== "card" && !phone.trim()) { setActionMessage("Enter the mobile money number for the selected payment method."); return; }
+    setSaving(true); setActionMessage("");
+    try {
+      let paymentId = pendingPaymentId;
+      if (!paymentId) {
+        const payment = await startPublishingPayment(token, { businessProfileId: profileId, method, phone: method === "card" ? undefined : phone, description: `Republish event: ${editTitle}` });
+        if (!payment) throw new Error("Could not start the publishing-fee payment.");
+        paymentId = payment.id;
+        setPendingPaymentId(payment.id);
+        if (payment.checkoutUrl) {
+          setCheckoutUrl(payment.checkoutUrl);
+          setActionMessage("Complete payment in the secure PayChangu page, then select Verify payment & republish.");
+          setSaving(false);
+          return;
+        }
+      }
+      const status = await waitForPayment(token, profileId, paymentId, { timeoutMs: 180000, intervalMs: 3000 });
+      if (status !== "succeeded") { setActionMessage(status === "timeout" ? "Payment is still pending. You can verify again without paying twice." : `Payment ${status}. Please start a new payment if needed.`); if (status !== "timeout") setPendingPaymentId(null); return; }
+      const updated = await republishEvent(token, item.id, {
+        paymentId,
+        title: editTitle.trim(),
+        location: editLocation.trim(),
+        description: editDescription,
+        startsAt: new Date(editDate).toISOString(),
+        tickets: editTickets.map((t) => ({ ...t, price: Number(t.price), capacity: Number(t.capacity) })),
+      });
+      if (!updated) throw new Error("Payment succeeded but the event update was not confirmed. Contact support before trying another payment.");
+      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, title: updated.title, location: updated.location, startsAt: updated.startsAt } : e));
+      setDetails((prev) => ({ ...prev, [String(item.id)]: updated }));
+      setActionMessage("Publishing fee verified. Event and ticket information republished successfully.");
+      setEditingId(null);
+    } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not republish this event."); }
+    finally { setSaving(false); }
+  }
 
   if (error) return <p role="alert" className="rounded-lg bg-error-surface px-3 py-2 text-sm text-error">{error}</p>;
   if (!events) return <p className="text-sm text-ink-muted">Loading…</p>;
@@ -167,6 +266,44 @@ function EventList({
               image={item.image}
               onSaved={(image) => setEvents((prev) => prev && prev.map((e) => (e.id === item.id ? { ...e, image } : e)))}
             />
+            <div className="mb-3 flex flex-wrap gap-3 text-sm font-semibold">
+              <button type="button" onClick={() => void openEditor(item)} className="text-navy-950 underline">Edit / republish</button>
+              <button type="button" disabled={saving} onClick={() => void removeEvent(item)} className="text-error underline">Delete</button>
+            </div>
+            {editingId === item.id && (
+              <div className="mb-4 rounded-xl border border-line bg-surface-alt p-4">
+                <h3 className="font-semibold text-navy-950">Edit and republish listing</h3>
+                <p className="mt-1 text-xs text-ink-muted">Changing listing or ticket information requires a publishing fee. Date-only extensions below are free.</p>
+                <div className="mt-3 grid gap-3">
+                  <label className="text-xs font-medium text-ink">Event title<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={`mt-1 ${inputClass} h-11 w-full`} /></label>
+                  <label className="text-xs font-medium text-ink">Location<input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className={`mt-1 ${inputClass} h-11 w-full`} /></label>
+                  <label className="text-xs font-medium text-ink">Description<textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>
+                  <label className="text-xs font-medium text-ink">Event date / time<input type="datetime-local" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={`mt-1 ${inputClass} h-11 w-full`} /></label>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={saving} onClick={() => void extendDate(item)} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-navy-950">Extend date only — free</button>
+                  </div>
+                  <div className="border-t border-line pt-3">
+                    <div className="flex items-center justify-between"><span className="text-sm font-semibold">Ticket types</span><button type="button" onClick={() => setEditTickets((prev) => [...prev, { name: "", price: 0, currency: "MWK", capacity: 1, perks: [] }])} className="text-xs font-semibold underline">+ Add ticket</button></div>
+                    {editTickets.map((ticket, index) => (
+                      <div key={String(ticket.id ?? `new-${index}`)} className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface p-2 sm:grid-cols-4">
+                        <input aria-label="Ticket name" value={ticket.name} onChange={(e) => setEditTickets((prev) => prev.map((t, i) => i === index ? { ...t, name: e.target.value } : t))} placeholder="Ticket name" className={inputClass} />
+                        <input aria-label="Ticket price" type="number" min={0} value={ticket.price} onChange={(e) => setEditTickets((prev) => prev.map((t, i) => i === index ? { ...t, price: Number(e.target.value) } : t))} className={inputClass} />
+                        <input aria-label="Ticket capacity" type="number" min={1} value={ticket.capacity} onChange={(e) => setEditTickets((prev) => prev.map((t, i) => i === index ? { ...t, capacity: Number(e.target.value) } : t))} className={inputClass} />
+                        <button type="button" onClick={() => setEditTickets((prev) => prev.filter((_, i) => i !== index))} className="text-xs text-error underline">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-lg border border-line bg-surface p-3">
+                    <p className="text-sm font-semibold">Publishing fee {publishingFee ? `· ${formatPrice(publishingFee.amount, publishingFee.currency)}` : "· loading…"}</p>
+                    <PaymentChoice idPrefix={`republish-${item.id}`} method={method} onMethodChange={setMethod} phone={phone} onPhoneChange={setPhone} />
+                    {checkoutUrl && <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold underline">Continue to secure checkout</a>}
+                    <button type="button" disabled={saving} onClick={() => void payAndRepublish(item)} className="mt-3 w-full rounded-lg bg-navy-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Verifying / saving…" : pendingPaymentId ? "Verify payment & republish" : "Pay publishing fee & republish"}</button>
+                  </div>
+                  {actionMessage && <p role="status" className="text-xs text-ink-muted">{actionMessage}</p>}
+                  <button type="button" onClick={() => setEditingId(null)} className="text-left text-xs font-semibold underline">Close editor</button>
+                </div>
+              </div>
+            )}
             <div className="flex items-start justify-between gap-3">
               <p className="font-semibold text-navy-950">{item.title}</p>
               <Badge tone="neutral">{item.category}</Badge>
