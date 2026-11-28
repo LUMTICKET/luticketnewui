@@ -183,7 +183,7 @@ function EventList({
       const result = await deleteEventListing(token, item.id);
       if (!result) throw new Error("The server did not confirm the delete request.");
       setActionMessage(result.message ?? (result.deleted ? "Event deleted." : "Event updated."));
-      setEvents((prev) => prev?.filter((e) => e.id !== item.id));
+      setEvents((prev) => prev?.filter((e) => e.id !== item.id) ?? null);
     } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not delete this event."); }
     finally { setSaving(false); }
   }
@@ -193,7 +193,7 @@ function EventList({
     setSaving(true); setActionMessage("");
     try {
       await extendEventDate(token, item.id, { startsAt: new Date(editDate).toISOString() });
-      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, startsAt: new Date(editDate).toISOString() } : e));
+      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, startsAt: new Date(editDate).toISOString() } : e) ?? null);
       setActionMessage("Event date extended successfully. No publishing fee was charged.");
     } catch (e) { setActionMessage(e instanceof Error ? e.message : "Could not extend the date."); }
     finally { setSaving(false); }
@@ -228,7 +228,7 @@ function EventList({
         tickets: editTickets.map((t) => ({ ...t, price: Number(t.price), capacity: Number(t.capacity) })),
       });
       if (!updated) throw new Error("Payment succeeded but the event update was not confirmed. Contact support before trying another payment.");
-      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, title: updated.title, location: updated.location, startsAt: updated.startsAt } : e));
+      setEvents((prev) => prev?.map((e) => e.id === item.id ? { ...e, title: updated.title, location: updated.location, startsAt: updated.startsAt } : e) ?? null);
       setDetails((prev) => ({ ...prev, [String(item.id)]: updated }));
       setActionMessage("Publishing fee verified. Event and ticket information republished successfully.");
       setEditingId(null);
